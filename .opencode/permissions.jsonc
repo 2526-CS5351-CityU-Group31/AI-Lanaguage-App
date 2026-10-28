@@ -1,0 +1,55 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Default-deny posture: no read, no write unless explicitly whitelisted below
+  "permission": {
+    "read": {
+      "*": "deny",
+      "AGENTS.md": "allow",
+      "Prompt.md": "allow",
+      "README.md": "allow",
+      "docs/**": "allow",
+      "prompts/**": "allow",
+      "src/**": "allow",
+      "test/**": "allow",
+      "*.env*": "deny"
+    },
+    "edit": {
+      "*": "deny",
+      // Governance and human-only files are strictly frozen against agent edits
+      ".opencode/**": "deny",
+      ".agent/**": "deny",
+      "AGENTS.md": "deny",
+      "Prompt.md": "deny",
+      // Safety-critical paths require explicit human approval ("ask") + ADR
+      "src/backend/safety/**": "ask",
+      // Standard implementation and test paths require human gate approval
+      "src/**": "ask",
+      "test/**": "ask",
+      "docs/architecture/**": "ask",
+      "docs/req/**": "ask"
+    },
+    "bash": {
+      "*": "ask",
+      "pytest *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git push*": "deny",
+      "rm -rf*": "deny"
+    }
+  },
+  // Role-based permission profiles matching D2.6 Permission Model
+  "roles": {
+    "plan_agent": {
+      "read": ["AGENTS.md", "Prompt.md", "docs/**"],
+      "write": ["docs/architecture/**"]
+    },
+    "build_agent": {
+      "read": ["AGENTS.md", "Prompt.md", "docs/**", "src/**", "test/**"],
+      "write": ["src/**", "test/offline/**"]
+    },
+    "verify_agent": {
+      "read": ["AGENTS.md", "docs/**", "src/**", "test/**"],
+      "write": ["test/**"]
+    }
+  }
+}
