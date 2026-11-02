@@ -1,10 +1,21 @@
 # Review memos
 
 **Purpose:** for each PR, record whether it is aligned with the specification and architecture, whether code and test quality are acceptable, and the verdict.
-**Owner:** Member 5 (QA & Governance); every reviewer writes their own memo section.
+**Owner (template):** Member 5 (QA & Governance).
+**Author of each memo:** the **reviewer of that PR, never its author.** The default reviewer is the PM (Member 1); Member 5 reviews any PR the PM authors. A reviewer may not write the memo for their own change.
 **Rule:** the memo reviews **governance**, not every line. A P0 finding must cite the invariant or ADR it violates; a P0 without a citation is a style opinion and must be downgraded to P2.
 
 **Verdict vocabulary:** `APPROVE` / `CHANGES REQUIRED` / `REJECT`. No other value is valid.
+
+## 0. Who reviews whom
+
+| PR author | Reviewer (writes the memo) |
+|---|---|
+| A teammate (Member 2/3/4) | PM (Member 1) |
+| PM (Member 1) | Member 5 |
+| Member 5 | PM (Member 1) |
+
+Each PR has exactly **one** reviewer and **one** memo section. The author fills the PR description (requirements, files, tests); the reviewer fills the memo (findings, verdict). Independence is mandatory: author ≠ reviewer. If neither the PM nor Member 5 is available, the PR waits rather than self-approving.
 
 ## 1. Index
 
