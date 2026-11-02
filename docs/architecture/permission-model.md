@@ -38,7 +38,7 @@
 | config module (`src/backend/` config) | read | guarded write | read | yes - new env key + config doc | hook `guard_config` | declared |
 | `src/backend/**` (all other modules) | read | guarded write | read | plan approval + reviewer | `permissions.jsonc` | declared |
 | `src/backend/contracts/**`, `src/backend/db/**` | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
-| `frontend/**` | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
+| `src/frontend/**` | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
 | `test/structural/**`, `test/offline/**`, `test/live/**` | read | guarded write only after test approval | read/append evidence | approval artifact (`G2`) | hook `guard_test_approval` | declared |
 | `scripts/validate_req.py`, `scripts/check_*.py`, `scripts/run_eval.py` | read | **no access** | read | yes - gate integrity | hook `guard_gate_scripts` | declared |
 | `scripts/**` (other) | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
@@ -50,7 +50,7 @@
 | `.github/workflows/**` | read | **no access** | read | yes | hook `guard_ci` | declared |
 | `.opencode/permissions.jsonc`, `.agent/rules.md` | read (no config) | **no access** | **no access** | yes | hook `guard_agent_config` | declared |
 | `AGENTS.md`, `Prompt.md`, `Report.md` | read | read | read | yes - human author | hook `guard_frozen` | declared |
-| `README.md`, `docker-compose.yml`, `.env.example`, `pyproject.toml`, `frontend/package.json` | read | guarded write | read | dependency change needs an ADR | `permissions.jsonc` | declared |
+| `README.md`, `docker-compose.yml`, `.env.example`, `pyproject.toml`, `src/frontend/package.json` | read | guarded write | read | dependency change needs an ADR | `permissions.jsonc` | declared |
 | `.env`, `.env.*` (except `.env.example`), any secret file | **no access** | **no access** | **no access** | humans via secret store only | hook `guard_secret` | declared |
 | `reports/**`, `.pytest_cache/**`, test temp files | read | write | write | no | `permissions.jsonc` | declared |
 | Any path not listed | **no access** | **no access** | **no access** | yes | default deny | declared |

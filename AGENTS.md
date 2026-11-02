@@ -13,7 +13,7 @@ Before generating any plan or code, read the following artifacts in exact sequen
 6. `docs/code-governance/structural-constraints.md`
 7. `docs/code-governance/verification-constraints.md`
 8. `docs/architecture/role-ownership.md`
-8. `Prompt.md` (Launch Instruction)
+9. `Prompt.md` (Launch Instruction)
 
 ## 3. Code Baseline & Path Authority
 - **Frozen (No Agent Write):** `.opencode/`, `.agent/`, `AGENTS.md`, `Prompt.md`, `.github/workflows/`
@@ -23,7 +23,7 @@ Before generating any plan or code, read the following artifacts in exact sequen
 
 ## 4. Module Organization & Integration Contracts
 - `src/backend/ai_companion/`: Genuine AI component (LLM prompt assembly, layered context window, tutor dialogue). Advisory authority only.
-- `src/backend/safety/`: Deterministic safety boundary enforcing hard lexical, schema, and educational constraints before any AI output reaches the user. Authoritative gate.
+- `src/backend/safety_boundary/`: Deterministic safety boundary enforcing hard lexical, schema, and educational constraints before any AI output reaches the user. Authoritative gate.
 - `src/backend/api/` & `src/frontend/`: Application service layer and user interface communicating via strict JSON schema contracts.
 
 ## 5. Verification Requirements

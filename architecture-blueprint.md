@@ -171,7 +171,7 @@ Support packages that are not architectural elements: `src/backend/contracts/` (
 
 | Stage | May do | May not do | Human gate |
 |---|---|---|---|
-| Plan | Read requirements/ADR/invariants; produce a plan with requirement IDs, files, interfaces, negative tests and rollback | Write `src/`, `frontend/`, `prompts/` or CI | Human approves the plan before any code (`NFR-GOV-001`) |
+| Plan | Read requirements/ADR/invariants; produce a plan with requirement IDs, files, interfaces, negative tests and rollback | Write `src/`, `prompts/` or CI | Human approves the plan before any code (`NFR-GOV-001`) |
 | Build | Write permitted source, tests and docs; run Tier 1/2 locally | Touch protected paths, approve its own plan, change thresholds | Reviewer confirms approval artifact and AI log entry |
 | Verify | Run Tiers 1-3, add tests and evidence, update trace status | Modify `src/` or relax a threshold | Verification evidence linked in the PR |
 | Review | Write a review memo with P0/P1/P2 findings and a verdict | Approve its own PR or waive a P0 without an invariant/ADR citation | Named human reviewer signs the memo |
@@ -191,7 +191,7 @@ The stage sequence is Plan -> Build -> Verify -> Review -> Release. No stage may
 | `docs/architecture/adr/**`, `architecture-blueprint.md` | read | read | read | yes - ADR/blueprint change |
 | `docs/architecture/**` registers | read | read/write for status/evidence only | read/write evidence | yes for rule changes |
 | `src/backend/safety_boundary/**`, `src/backend/auth/security.py` | read | **no access** | read | yes - human + ADR |
-| `src/**` (other modules), `frontend/**`, `scripts/**` | read | write (guarded) | read | plan approval + review |
+| `src/**` (other modules), `src/frontend/**`, `scripts/**` | read | write (guarded) | read | plan approval + review |
 | `migrations/**` | read | write before first apply; frozen after | read | reviewer + rollback plan |
 | `prompts/**`, `content/**`, `.github/workflows/**`, `.opencode/**`, `.agent/**` | read | **no access** | read | yes |
 | `test/**` | read | write after test approval | read/write evidence | approval artifact |
@@ -214,7 +214,7 @@ mypy --strict src
 pytest test/offline -q
 python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline
 python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --live
-npm --prefix frontend run test:a11y
+npm --prefix src/frontend run test:a11y
 python scripts/check_ai_log.py --pr $PR
 ```
 
@@ -307,7 +307,7 @@ docs/
 src/backend/             # 18 element modules across safety_boundary/ ai_companion/ api/ auth/ database/ grammar/ user_progress/ vocabulary/ + main.py
 src/backend/contracts/   # typed DTOs, ports, enums
 src/backend/db/          # connection, unit of work, repository primitives
-frontend/                # React + TypeScript learner UI
+src/frontend/            # React + TypeScript learner UI
 test/offline/            # deterministic, no network, stub model/retrieval
 test/live/               # controlled provider evaluation, credentials required
 test/structural/         # import and architecture fitness functions

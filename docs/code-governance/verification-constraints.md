@@ -37,7 +37,7 @@ mypy --strict src
 pytest test/offline -q
 python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline
 python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --live
-npm --prefix frontend run test:a11y
+npm --prefix src/frontend run test:a11y
 python scripts/check_ai_log.py --pr $PR
 ```
 
@@ -136,7 +136,7 @@ Run in order from a fresh clone; record the command and result in the PR or repo
 7. `pytest test/offline -q` -> pass; 0 skipped safety tests.
 8. `python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline` -> thresholds in §4.
 9. `python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --live` -> thresholds in §4; evidence linked; fails closed if credentials are missing.
-10. `npm --prefix frontend run test:a11y` -> 0 critical violations on five flows.
+10. `npm --prefix src/frontend run test:a11y` -> 0 critical violations on five flows.
 11. `grep -rn "os\.environ\|os\.getenv\|load_dotenv" src --include='*.py' | grep -v 'config.py:'` -> no output.
 12. `git diff --exit-code -- docs/req/requirements.yaml docs/architecture/adr architecture-blueprint.md prompts/ evals/` -> no diff against the frozen baseline (except in a declared delta round).
 13. `python scripts/check_ai_log.py --pr $PR` -> 0 code/prompt diffs without a session entry.
