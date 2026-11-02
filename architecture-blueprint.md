@@ -302,7 +302,7 @@ docs/
   req/{prd.yaml, requirements.yaml, req-schema.json}
   architecture/
     adr/{001-guarded-monolith.md, 005-validated-response-contract.md, 006-layered-context.md,
-         007-transactional-publishing.md, 008-event-sourced-records.md, 009-memory-and-privacy.md,
+         007-content-ingestion-and-retrieval.md, 008-event-sourced-records.md, 009-memory-and-privacy.md,
          010-agent-tool-boundary.md}
     invariants.md
     trace-matrix.md
