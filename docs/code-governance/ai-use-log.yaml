@@ -125,3 +125,12 @@ sessions:
     files_touched:
       - "docs/architecture/adr/010-agent-tool-boundary.md"
     human_interventions: "Human chose to keep G4 but reframe it to offline-ingest approval. Agent remapped REQ-LANG-GOV-004/005 to NFR-GOV-002/001, reframed G4 and the content-reviewer role to FR-CORP-001, and verified no legacy IDs and all referenced IDs resolve to SSOT. This completes the 7-ADR remap (Item 5)."
+  - session_id: "SES-014"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B step 6a: rescope memory-design.md to learner data storage & isolation (SSOT store inventory, INV-AUTH-001); remove uncovered checkpoint/summary/retention/redaction content."
+    files_touched:
+      - "docs/architecture/memory-design.md"
+    human_interventions: "Human chose to rescope rather than delete. Agent rebuilt the doc around the SSOT-backed store inventory and owner-scoped isolation, with a scope note explaining the removed memory content; verified no legacy IDs, all IDs resolve to SSOT."
