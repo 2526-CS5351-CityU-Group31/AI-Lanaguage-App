@@ -143,3 +143,15 @@ sessions:
     files_touched:
       - "docs/architecture/runtime-policy-catalog.md"
     human_interventions: "Human approved the proposed RP-001..RP-017 ID scheme. Agent rebuilt the policy table, retry budgets, coverage decisions and invariant-coverage check to the 13 SSOT invariants; verified no legacy IDs, all 13 invariants covered, no removed-content refs."
+  - session_id: "SES-016"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B step 6c: batch-align risk-list, option-ledger, evaluation-logbook and evaluation-table to the SSOT; remap mitigations to SSOT modules and remove references to removed memory/quiz/publication content."
+    files_touched:
+      - "docs/architecture/risk-list.md"
+      - "docs/architecture/option-ledger.md"
+      - "docs/architecture/evaluation-logbook.md"
+      - "docs/architecture/evaluation-table.md"
+    human_interventions: "Human approved the risk-list register rewrite and the batch approach. Agent removed uncovered risks R-004/R-007/R-010, remapped mitigations to SSOT modules, pruned option-ledger US$0.04/quiz/ARCH-003 references, appended L-013 to the append-only logbook (history rows kept), and reworded evaluation-table D5. Verified no unknown IDs; the only remaining REQ-LANG is in preserved history (L-004) and is annotated by L-013. This completes Item 6."

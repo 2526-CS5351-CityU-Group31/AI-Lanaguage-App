@@ -25,19 +25,17 @@ These are smaller decisions made during the baseline. Each names the failed rule
 |---|---|---|---|---|---|
 | Free-form prose responses with regex checks | Invariant protection / provenance | A regex cannot prove a quoted lesson exists in the retrieved published set | Rejected | None; a new contract must pass the same validator tests | ADR-005 |
 | Model self-critique of its own citations | Authority separation | The same model is not an independent gate and can rationalise an invented source | Rejected | A separately governed verifier with its own model and evidence, added by ADR | ADR-005 |
-| Two-model critic in R1 | Cost and latency | Doubles spend and adds a non-deterministic judge without a deterministic gate | **Deferred** | Cost per session <= US$0.02 with the critic included, and citation validity stays 100% in a trial | ADR-005 |
+| Two-model critic in R1 | Cost and latency | Doubles spend and adds a non-deterministic judge without a deterministic gate | **Deferred** | Cost per session within budget with the critic included, and citation validity stays 100% in a trial | ADR-005 |
 | Two-model critic for pedagogy quality | Quality evidence | A model judge is not ground truth for pedagogy; human scoring is required | Deferred | If human review capacity < 2 reviewers per release, a model judge may *triage*, never decide | ADR-005 |
-| Post-filtering after top-k retrieval | Published-only proof | An unpublished chunk can influence ranking before it is filtered | Rejected | None; pre-filter is a hard rule (`ARCH-003`) | ADR-007 |
-| In-place corpus edits | Reversibility / provenance | A half-updated lesson can serve mixed sections and cannot be rolled back | Rejected | None; a version switch is the only publish path | ADR-007 |
-| Full transcript in every prompt | Cost, latency, privacy | Unbounded context and longer retention in provider requests | Rejected | A context window > 10x the current budget plus a cost model that stays under US$0.04 | ADR-006 |
-| Silent truncation of old turns | Continuity and inspectability | The learner cannot see or correct what was forgotten | Rejected | None; compaction must write an inspectable summary | ADR-006 |
+| Post-filtering after top-k retrieval | Published-only proof | An unpublished chunk can influence ranking before it is filtered | Rejected | None; pre-filter is a hard rule (`INV-SCOPE-006`) | ADR-007 |
+| In-place corpus edits | Reversibility / provenance | A half-updated lesson can serve mixed sections and cannot be rolled back | Rejected | None; re-ingestion is the only path | ADR-007 |
+| Full transcript in every prompt | Cost, latency | Unbounded context breaches the 1,500-token ceiling | Rejected | A context model that stays within `NFR-COST-001` | ADR-006 |
+| Silent truncation of old turns | Continuity | The learner cannot see or correct what was forgotten | Rejected | None; compaction at 6 messages is explicit | ADR-006 |
 | Denormalised progress counters | Invariant protection / parity | A lost update or retry drifts the total with no source of truth | Rejected | A cache with a same-request parity check and an event-sourced backfill (allowed only as a cache) | ADR-008 |
-| Client-computed quiz score | Authority / isolation | The client is untrusted; a forged score becomes a record | Rejected | None | ADR-008 |
-| External memory service | Testability and privacy | Another processor and network contract for state PostgreSQL can hold | Rejected | A managed service with regional residency, deletion SLA and offline contract tests, after an ADR | ADR-009 |
-| Vendor-managed thread state | Reproducibility | Context cannot be reconstructed from our own records | Rejected | Vendor exposes a full, exportable turn log with versions | ADR-009 |
+| External memory service | Testability | Another processor and network contract for state PostgreSQL can hold | Rejected | A managed service with regional residency and offline contract tests, after an ADR | ADR-009 |
+| Model-generated progress narrative | Record integrity | A narrative cannot be audited or recomputed | Rejected | None | ADR-008 |
 | Agent self-approval of its own plan | Authority separation | Planner and approver become the same principal | Rejected | None | ADR-010 |
 | Unrestricted shell/file access for agents | Enforcement | A protected path is protected only by the model's willingness to obey | Rejected | None; every mutation goes through a named tool | ADR-010 |
-| Model-generated progress narrative | Record integrity | A narrative cannot be audited or recomputed | Rejected | None | ADR-008 |
 
 ## 3. Conditions that would reopen the chosen architecture
 
@@ -49,7 +47,7 @@ These are smaller decisions made during the baseline. Each names the failed rule
 | Hosting constraint | Managed PostgreSQL lacks pgvector at the selected plan | ADR-007 reopened; C2/C3 scored again |
 | Vendor requirement | Team ops capacity < 0.5 FTE for 2 sprints, vendor meets residency/replay conditions | C3 viability review (ADR-003) |
 | Safety incident | Any invariant bypass or cross-user exposure | ADR-001, ADR-005 and the invariant register reviewed before any feature work |
-| Cost drift | 7-day mean session cost > US$0.04 | ADR-006 budget and ADR-005 output cap reviewed |
+| Cost drift | 7-day mean token usage drift > 25% | ADR-006 budget and ADR-005 output cap reviewed |
 
 ## 4. Rule for adding a row
 
