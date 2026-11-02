@@ -1,90 +1,65 @@
 # Trace matrix - baseline R1 (design view)
 
-**Status of this view:** every row is `design` on 2026-10-27. No implementation exists yet; `planned:` means the test or command is designed and its path is reserved, but the file is not in the repository until the build round. Those gaps are tracked once as `DBT-003`, not hidden per row.
+**Status of this view:** every row is `design`. No implementation exists yet; `planned:` means the test or command is designed and its path is reserved, but the file is not in the repository until the build round. Gaps are tracked once as `DBT-003`, not hidden per row.
 
-**Coverage rule:** the matrix has exactly one row per requirement in `docs/req/requirements.yaml` (39 rows: 36 `must`, 3 `should`, 18 ASR). No orphans in either direction. `scripts/check_trace.py` (planned) enforces the row count and the REQ id set.
+**Coverage rule:** the matrix has exactly one row per requirement in `docs/req/requirements.yaml` (31 rows: 30 `Must`, 1 `Should`; types: 13 `invariant`, 9 `functional`, 9 NFR). No orphans in either direction.
 
 **Status vocabulary:** `design` -> `implemented` -> `tested`. A row may not move to `tested` unless the named test exists at the named path and passes. A retired requirement keeps its row and changes status to `retired` first.
 
 **Evidence legend:** `planned:` = designed but not yet in the repo (`DBT-003`); `gate:` = CI script to be written; `none` = no runtime monitor, with a justification in the cell.
 
-| REQ | Type | Status | Cluster | Architectural consequence | Enforcing component | Test / evidence | Runtime monitor |
-|---|---|---|---|---|---|---|---|
-| REQ-LANG-ARCH-001 | architectural_constraint | design | CL-AUTHORITY | One validation gate; validator import restricted to the tutor pipeline | `ResponseValidator` | planned: `test/structural/test_authority_imports.py::test_single_validation_gate` | `validation_reject_total`, `validation_bypass_count` |
-| REQ-LANG-INV-001 | invariant | design | CL-AUTHORITY | Advisory -> validator -> persistence is a one-way flow | `ResponseValidator.validate_output()` | planned: `test/offline/invariants/test_inv_001_no_unvalidated_output.py` | `unvalidated_output_total` (must stay 0) |
-| REQ-LANG-INV-002 | invariant | design | CL-AUTHORITY | Retrieved evidence is an input to validation; citations rendered from server metadata | `ResponseValidator.validate_citations()` | planned: `test/offline/invariants/test_inv_002_citation_provenance.py` | `citation_reject_total`, `citation_bypass_total` |
-| REQ-LANG-SEC-001 | security | design | CL-AUTHORITY | Untrusted evidence block; no tool schema in the prompt; constraints restated after evidence | `PromptAssembler.assemble()` | planned: `test/offline/invariants/test_inv_007_retrieved_text_is_data.py` | `injection_escape_total` (must stay 0) |
-| REQ-LANG-ARCH-002 | architectural_constraint | design | CL-AUTHORITY | `TutorPipeline` excluded from the database package; persistence is a separate call | `TutorPipeline.handle_turn()` | planned: `test/structural/test_authority_imports.py::test_tutor_pipeline_read_only` | `tutor_pipeline_db_writes` (must stay 0) |
-| REQ-LANG-SEC-002 | security | design | CL-ISOLATION | Owner-scoped repository boundary; 404 for foreign records | `OwnershipGuard.authorize()` | planned: `test/offline/invariants/test_inv_003_cross_user_isolation.py` | `cross_user_exposure_total`, `cross_user_denial_total` |
-| REQ-LANG-INV-003 | invariant | design | CL-ISOLATION | Principal comes only from the authenticated session | `RequestAuthenticator` | planned: `test/offline/invariants/test_inv_003_cross_user_isolation.py::test_identity_not_from_payload` | `identity_spoof_attempts` |
-| REQ-LANG-FR-001 | functional | design | CL-ISOLATION | Identity boundary and profile store | `LearnerProfileService` | planned: `test/offline/test_auth_profile.py` | `auth_failure_total` |
-| REQ-LANG-FR-002 | functional | design | CL-ISOLATION | Immutable session owner; server-assigned turn order | `PracticeSessionService` | planned: `test/offline/test_session_ownership.py` | `session_owner_mutation_total` (0) |
-| REQ-LANG-SEC-003 | security | design | CL-ISOLATION | `AppConfig` is the only `os.environ` reader; secrets not bundled | `AppConfig` | planned: `scripts/scan_secrets.py --scope repo,frontend/dist,logs --sample 100` | `secret_scan_findings` (0) |
-| REQ-LANG-SEC-004 | security | design | CL-ISOLATION | Curriculum store and learner store are separate; no learner text in the index | `ContentPublisher.ingest()` | planned: `test/offline/invariants/test_inv_009_privacy_boundary.py` + `test_inv_010_redaction.py` | `learner_text_in_shared_stores` (0), `redaction_failure_total` (0) |
-| REQ-LANG-FR-003 | functional | design | CL-GROUNDING | Retrieval and citation-rendering path; source metadata from the database | `RetrievalService` | planned: `python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline --case-type grounded --check citations` | `grounded_answer_total`, `citation_render_total` |
-| REQ-LANG-FR-004 | functional | design | CL-GROUNDING | Abstention branch owned by the degradation controller | `DegradationController` | planned: `python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline --case-type abstain --check abstention` | `no_evidence_total`, `abstention_total` |
-| REQ-LANG-ARCH-003 | architectural_constraint | design | CL-GROUNDING | Published/language/level/topic filters run before ranking | `RetrievalService.search()` | planned: `test/offline/invariants/test_inv_008_published_only.py` | `unpublished_chunk_served` (0) |
-| REQ-LANG-NFR-001 | quality | design | CL-GROUNDING | Chunking, top-5 retrieval, reranking | `RetrievalService` | planned: `python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline --metric recall_at_5` | `retrieval_recall_at_5` (nightly on fixed set) |
-| REQ-LANG-NFR-002 | quality | design | CL-GROUNDING | Citation gate and server-rendered metadata | `ResponseValidator` | planned: `python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline --metric citation_validity` | `citation_validity` (release gate) |
-| REQ-LANG-NFR-003 | quality | design | CL-GROUNDING | Human-scored evaluation set with two reviewers | `TutorPipeline` (evaluated output) | planned: `python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --metric grounded_correctness --human-scored` | `grounded_correctness` (eval run) |
-| REQ-LANG-PERF-001 | performance | design | CL-GROUNDING | HNSW index and query plan on the active chunks | `RetrievalService` | planned: `python scripts/bench_retrieval.py --chunks 1000 --concurrency 5 --runs 50` | `retrieval_p95_ms` |
-| REQ-LANG-FR-005 | functional | design | CL-RECORD | Original and suggestion stored separately; suggestion labelled | `WritingFeedbackService` | planned: `test/offline/test_writing_feedback.py` | `silent_overwrite_total` (0) |
-| REQ-LANG-FR-006 | functional | design | CL-RECORD | Confirmation state machine; unique `(user_id, word, sense)` | `VocabularyService` | planned: `test/offline/test_vocabulary.py` | `unconfirmed_mastery_total` (0) |
-| REQ-LANG-FR-007 | functional | design | CL-RECORD | Server-held answer keys; key never in the client model | `AssessmentService` | planned: `test/offline/test_quiz_contract.py` | `ambiguous_quiz_item_served` (0) |
-| REQ-LANG-INV-004 | invariant | design | CL-RECORD | Request model excludes `score`; scoring is a server function | `AssessmentService.score_attempt()` | planned: `test/offline/invariants/test_inv_004_backend_scoring.py` | `client_score_acceptance_total` (0) |
-| REQ-LANG-FR-008 | functional | design | CL-RECORD | Dashboard projection over `learning_events` | `ProgressLedger.project_progress()` | planned: `test/offline/test_progress_projection.py` | `dashboard_projection_errors` |
-| REQ-LANG-INV-005 | invariant | design | CL-RECORD | Event log is the single source of truth for totals | `ProgressLedger.project_progress()` | planned: `test/offline/invariants/test_inv_005_progress_parity.py` | `progress_total_mismatch_total` (0) |
-| REQ-LANG-FR-009 | functional | design | CL-RECORD | Bounded user-scoped summary; context-only | `SessionSummaryStore` | planned: `test/offline/test_session_summary.py` + `test/offline/invariants/test_inv_011_summary_isolation.py` | `summary_scope_violation_total` (0) |
-| REQ-LANG-NFR-004 | quality | design | CL-RESILIENCE | 25 s provider timeout, fixed context budget, bounded retries | `TutorPipeline` / `ModelGateway` | planned: `python scripts/bench_tutor_latency.py --turns 30 --env reference` | `ai_turn_latency_seconds` p95 |
-| REQ-LANG-NFR-005 | quality | design | CL-RESILIENCE | Checkpoint + retry state; completion stays false on failure | `PracticeSessionService` | planned: `test/offline/test_degradation.py` | `failed_turn_completion_total` (0) |
-| REQ-LANG-INV-006 | invariant | design | CL-RESILIENCE | Fail-closed orchestration; no raw text on the failure path | `TutorPipeline.handle_turn()` | planned: `test/offline/invariants/test_inv_006_no_safety_bypass.py` | `safety_bypass_total` (0) |
-| REQ-LANG-NFR-006 | quality | design | CL-RESILIENCE | Retrieval-outage abstention route | `DegradationController` | planned: `test/offline/test_degradation.py::test_retrieval_unavailable` | `retrieval_failure_abstention_rate` |
-| REQ-LANG-COST-001 | cost | design | CL-COST | Per-user call counter and server-side cap in the model gateway | `ModelGateway` | planned: `test/offline/test_cost_cap.py` | `ai_calls_per_user_day`, `ai_calls_over_cap` (0) |
-| REQ-LANG-COST-002 | cost | design | CL-COST | Token accounting per turn and a daily cost series | `ObservabilityStore` | planned: `python scripts/report_cost.py --window 7d --session-size 6` | `session_cost_usd`, `cost_drift_ratio` |
-| REQ-LANG-FR-010 | functional | design | CL-EVOLUTION | Versioned publish workflow with provenance and reviewer | `ContentPublisher` | planned: `test/offline/test_content_publish.py` | `publish_state_integrity` (100%) |
-| REQ-LANG-GOV-001 | governance | design | CL-EVOLUTION | Atomic version pointer; retired excluded before query | `ContentPublisher.activate()` | planned: `test/offline/invariants/test_inv_008_published_only.py` | `unpublished_chunk_served` (0), `active_version_count` |
-| REQ-LANG-GOV-002 | governance | design | CL-EVOLUTION | Audit event field allowlist; version metadata per turn | `ObservabilityStore.append_turn_event()` | planned: `test/offline/test_observability_metadata.py` | `turn_metadata_completeness` (100%) |
-| REQ-LANG-GOV-003 | governance | design | CL-EVOLUTION | Evaluation replay gate in CI for model-facing changes | `scripts/check_eval_gate.py` | planned: `python scripts/check_eval_gate.py --base origin/main --head HEAD` | none - CI gate evidence only |
-| REQ-LANG-NFR-007 | quality | design | CL-ACCESS | Accessible component library; five critical flows tested | frontend flows (no backend element) | planned: `npm --prefix frontend run test:a11y` | none - CI gate evidence only |
-| REQ-LANG-GOV-004 | governance | design | CL-GOVERNANCE | AI use log gate keyed to session and PR | `scripts/check_ai_log.py` | planned: `python scripts/check_ai_log.py --pr $PR` | none - PR gate evidence only |
-| REQ-LANG-GOV-005 | governance | design | CL-GOVERNANCE | Approval artifact precedes implementation | `scripts/check_test_approval.py` | planned: `python scripts/check_test_approval.py --pr $PR` | none - PR gate evidence only |
-| REQ-LANG-ARCH-004 | architectural_constraint | design | CL-GOVERNANCE | Scope guard: no routes for deferred capabilities | `test/structural/test_scope.py` | planned: `test/structural/test_scope.py::test_no_out_of_scope_routes` | none - structural gate only |
+| REQ | Type | Status | Enforcing component | Test / evidence | Owner | Runtime monitor |
+|---|---|---|---|---|---|---|
+| INV-SCOPE-001 | invariant | design | `src/backend/safety_boundary/scope_guard.py` | planned: `test/offline/test_safety_boundary/test_scope_guard.py::test_scope_pipeline_execution_order` | Member 3 (Kapo) | `scope_result_logged_total` (must equal request count) |
+| INV-SCOPE-002 | invariant | design | `src/backend/safety_boundary/scope_guard.py` | planned: `test/offline/test_safety_boundary/test_scope_guard.py::test_fixed_refusal_response` | Member 3 (Kapo) | `fixed_refusal_total` |
+| INV-SCOPE-003 | invariant | design | `src/backend/api/routers/chat.py` | planned: `test/offline/test_safety_boundary/test_scope_guard.py::test_zero_calls_on_rejection` | Member 3 (Kapo) | `downstream_calls_on_rejection_total` (must stay 0) |
+| INV-SCOPE-004 | invariant | design | `src/backend/safety_boundary/scope_guard.py` | planned: `test/offline/test_safety_boundary/test_scope_guard.py::test_uncertain_intent_clarification` | Member 3 (Kapo) | `uncertain_intent_total` |
+| INV-SCOPE-005 | invariant | design | `src/backend/safety_boundary/scope_guard.py` | planned: `test/offline/test_safety_boundary/test_scope_guard.py::test_mixed_intent_blocking` | Member 3 (Kapo) | `mixed_intent_block_total` |
+| INV-SCOPE-006 | invariant | design | `src/backend/ai_companion/retrieval_adapter.py` | planned: `test/offline/test_ai_companion/test_retrieval_conditions.py::test_conditional_retrieval_routing` | Member 2 (Leon) | `ungrounded_retrieval_total` (must stay 0) |
+| INV-AUTH-001 | invariant | design | `src/backend/auth/security.py` | planned: `test/offline/test_auth/test_authorization.py::test_cross_user_isolation` | Member 3 (Kapo) | `cross_user_denial_total`, `cross_user_exposure_total` (0) |
+| INV-LANG-001 | invariant | design | `src/backend/api/schemas/profile.py` | planned: `test/offline/test_auth/test_profile.py::test_reject_non_english` | Member 3 (Kapo) | `non_english_reject_total` |
+| INV-CEFR-001 | invariant | design | `src/backend/api/schemas/profile.py` | planned: `test/offline/test_auth/test_profile.py::test_reject_invalid_cefr` | Member 3 (Kapo) | `invalid_cefr_reject_total` |
+| INV-SEC-001 | invariant | design | `src/backend/database/vector_client.py` | planned: `test/offline/test_database/test_vector_permissions.py::test_runtime_vector_read_only` | Member 5 (Luming) | `runtime_vector_write_attempt_total` (0) |
+| INV-SEC-002 | invariant | design | `src/backend/main.py` | planned: `test/offline/test_api/test_routes.py::test_no_upload_endpoints_exposed` | Member 5 (Luming) | none - structural route introspection |
+| INV-PROG-001 | invariant | design | `src/backend/user_progress/service.py` | planned: `test/offline/test_user_progress/test_dashboard.py::test_progress_derived_from_events` | Member 3 (Kapo) | `progress_mismatch_total` (0) |
+| INV-CITE-001 | invariant | design | `src/backend/safety_boundary/citation_validator.py` | planned: `test/offline/test_safety_boundary/test_citation_validator.py::test_reject_invalid_citations` | Member 2 (Leon) | `citation_reject_total`, `citation_bypass_total` (0) |
+| FR-AUTH-001 | functional | design | `src/backend/auth/router.py` | planned: `test/offline/test_auth/test_auth_flow.py::test_register_login` | Member 3 (Kapo) | `auth_failure_total` |
+| FR-PROF-001 | functional | design | `src/backend/auth/router.py` | planned: `test/offline/test_auth/test_profile.py::test_update_profile` | Member 3 (Kapo) | `profile_update_total` |
+| FR-CHAT-001 | functional | design | `src/backend/ai_companion/tutor.py` | planned: `test/offline/test_ai_companion/test_tutor.py::test_guided_conversation_flow` | Member 2 (Leon) | `conversation_turn_total` |
+| FR-FEED-001 | functional | design | `src/backend/grammar/evaluator.py` | planned: `test/offline/test_grammar/test_evaluator.py::test_writing_feedback_structure` | Member 2 (Leon) | `writing_feedback_total` |
+| FR-RAG-001 | functional | design | `src/backend/ai_companion/rag_pipeline.py` | planned: `test/offline/test_ai_companion/test_rag.py::test_grounded_answer_citation` | Member 2 (Leon) | `grounded_answer_total`, `citation_render_total` |
+| FR-VOC-001 | functional | design | `src/backend/vocabulary/loader.py` | planned: `test/offline/test_vocabulary/test_loader.py::test_random_selection_with_seed` | Member 3 (Kapo) | `vocabulary_served_total` |
+| FR-VOC-002 | functional | design | `src/backend/vocabulary/service.py` | planned: `test/offline/test_vocabulary/test_service.py::test_record_familiarity` | Member 3 (Kapo) | `vocabulary_review_total` |
+| FR-DASH-001 | functional | design | `src/backend/user_progress/service.py` | planned: `test/offline/test_user_progress/test_dashboard.py::test_dashboard_metrics_aggregation` | Member 4 (Henry) | `dashboard_projection_errors` |
+| FR-CORP-001 | functional | design | `scripts/ingest_content.py` | planned: `test/offline/test_scripts/test_ingestion.py::test_admin_ingest_pipeline` | Member 2 (Leon) | `ingest_report_generated_total` |
+| NFR-PERF-001 | performance | design | `src/backend/ai_companion/tutor.py` | planned: `test/live/test_latency.py::test_p95_response_latency` | Member 5 (Luming) | `ai_turn_latency_seconds` p95 |
+| NFR-QUAL-001 | quality | design | `src/backend/ai_companion/retrieval_adapter.py` | planned: `test/offline/test_ai_companion/test_retrieval_eval.py::test_recall_at_5` | Member 2 (Leon) | `retrieval_recall_at_5` |
+| NFR-QUAL-002 | quality | design | `src/backend/safety_boundary/evaluator.py` | planned: `test/live/test_semantic_eval.py::test_grounded_correctness` | Member 2 (Leon) | `grounded_correctness` (eval run) |
+| NFR-QUAL-003 | quality | design | `src/backend/safety_boundary/citation_validator.py` | planned: `test/offline/test_safety_boundary/test_citation_validator.py::test_zero_hallucinated_citations` | Member 2 (Leon) | `citation_validity` (release gate) |
+| NFR-QUAL-004 | quality | design | `src/backend/safety_boundary/scope_guard.py` | planned: `test/offline/test_safety_boundary/test_scope_guard.py::test_off_topic_refusal_accuracy` | Member 3 (Kapo) | `off_topic_refusal_accuracy` |
+| NFR-SEC-001 | security | design | `src/backend/ai_companion/prompt_assembly.py` | planned: `test/offline/test_safety_boundary/test_prompt_injection.py::test_zero_policy_escapes` | Member 5 (Luming) | `injection_escape_total` (must stay 0) |
+| NFR-COST-001 | cost | design | `src/backend/ai_companion/prompt_assembly.py` | planned: `test/offline/test_ai_companion/test_token_budget.py::test_token_cap_enforcement` | Member 2 (Leon) | `prompt_tokens_per_turn` (<= 1,500) |
+| NFR-GOV-001 | governance | design | `.github/workflows/ci.yml` | planned: `test/offline/test_governance/test_ci_config.py::test_blocking_gates_declared` | Member 5 (Luming) | none - CI gate evidence only |
+| NFR-GOV-002 | governance | design | `.github/workflows/ci.yml` | planned: `test/offline/test_governance/test_ai_log.py::test_log_gate_script` | Member 1 (Adrian) | none - PR gate evidence only |
 
 ## Coverage summary
 
 | Dimension | Value | Check |
 |---|---|---|
-| Rows | 39 | equals requirement count 39 |
-| Must rows with non-empty evidence | 36 / 36 | every must names a planned command or test |
-| Should rows with non-empty evidence | 3 / 3 | FR-009, PERF-001, NFR-007 |
-| ASR rows naming a blueprint element | 18 / 18 | `forces_element` resolves to the component table |
-| Invariant rows cross-linked to `invariants.md` | 11 / 11 | each `INV-*` appears in at least one row |
-| Rows with a runtime monitor | 34 | 5 governance/CI rows justify `none` |
+| Rows | 31 | equals SSOT requirement count 31 |
+| Must rows with non-empty evidence | 30 / 30 | every Must names a planned test |
+| Should rows with non-empty evidence | 1 / 1 | FR-CORP-001 |
+| Invariant rows cross-linked to `invariants.md` | 13 / 13 | each `INV-*` appears in the register |
+| Rows with a runtime monitor | 29 | 2 governance rows justify `none`; INV-SEC-002 is structural |
 | Rows whose state is `tested` | 0 | no implementation at baseline |
 | Orphans (requirement without row) | 0 | by construction |
 | Dead rows (row without requirement) | 0 | by construction |
 
-## Coverage by cluster
-
-| Cluster | Requirements in registry | Rows here | Complete? |
-|---|---|---|---|
-| CL-AUTHORITY | 5 | 5 | yes |
-| CL-ISOLATION | 6 | 6 | yes |
-| CL-GROUNDING | 7 | 7 | yes |
-| CL-RECORD | 7 | 7 | yes |
-| CL-RESILIENCE | 4 | 4 | yes |
-| CL-COST | 2 | 2 | yes |
-| CL-EVOLUTION | 4 | 4 | yes |
-| CL-ACCESS | 1 | 1 | yes |
-| CL-GOVERNANCE | 3 | 3 | yes |
-| **Total** | **39** | **39** | **yes** |
-
 ## Done-when status at baseline
 
 - [x] Row count equals requirement count; zero orphans both ways (by construction; script pending).
-- [x] Every `must` requirement has a non-empty test/evidence cell (a planned command).
+- [x] Every `Must` requirement has a non-empty test/evidence cell (a planned command).
 - [ ] Every row whose status is `tested` names an existing test - no row is `tested` yet.
-- [x] New rounds append rows and update status; no row is deleted to hide a retirement.
 - [ ] `scripts/check_trace.py` exists and fails on an orphan (`DBT-003`).
 
 ## Update protocol
@@ -92,4 +67,3 @@
 1. A new requirement is added to `requirements.yaml` first, then a row is appended here in the same PR.
 2. A test landing changes the row from `design` to `implemented`, then `tested` only after it passes in CI; the PR links the run.
 3. A requirement becoming `retired` changes the requirement status first; the row stays with `retired` status and its evidence history.
-4. A monitor name change is a one-line edit here and in the runtime policy catalog; no threshold is copied into this file.

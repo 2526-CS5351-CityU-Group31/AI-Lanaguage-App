@@ -7,6 +7,28 @@ on:
     branches: [ main, master ]
 
 jobs:
+
+  # Gate 1: Test Approval (placeholder - check_test_approval.py not yet implemented, DBT-002)
+  test-approval-gate:
+    name: "Gate 1: Test Approval"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Check Tests Precede Implementation
+        run: echo "Test approval check pending implementation (check_test_approval.py, DBT-002). Placeholder passes."
+
+  # Placeholder for Gates 2
+  static-analysis:
+    name: "Gate 2: Static Analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Run Linters & Type Checks
+        run: echo "Static analysis (lint, type-checking, dependency checks) running..."
+
   # Gate 3: Schema Gate (Validates requirements.yaml against req-schema.json)
   schema-gate:
     name: "Gate 3: Schema Gate"
@@ -43,6 +65,27 @@ jobs:
             print(f"Error reading files: {e}", file=sys.stderr)
             sys.exit(1)
           EOF
+
+  # Gate 4: Semantic Evaluation (placeholder - run_eval.py not yet implemented, DBT-001)
+  semantic-eval-gate:
+    name: "Gate 4: Semantic Evaluation"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Replay Evaluation Set
+        run: echo "Semantic evaluation pending implementation (run_eval.py, DBT-001). Placeholder passes."
+
+  # Placeholder for Gate 5
+  regression-tests:
+    name: "Gate 5: Regression Gate"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Run Deterministic Offline Test Suites
+        run: echo "Executing test/offline/ suites..."
 
   # Gate 6: AI-Use Log Gate (Blocks PRs that modify code/prompts without updating ai-use-log.yaml)
   ai-use-log-gate:
@@ -88,7 +131,7 @@ jobs:
           try:
               with open('docs/code-governance/ai-use-log-schema.json', 'r') as sf:
                   schema = json.load(sf)
-              with open('docs/ai-use-log.yaml', 'r') as lf:
+              with open('docs/code-governance/ai-use-log.yaml', 'r') as lf:
                   log_data = yaml.safe_load(lf)
               validate(instance=log_data, schema=schema)
               print("AI-use log schema is valid.")
@@ -97,22 +140,3 @@ jobs:
               sys.exit(1)
           EOF
 
-
-  # Placeholders for Gates 1, 2, 4, 5 (Expand as src/ and test/ suites are built)
-  static-analysis:
-    name: "Gate 2: Static Analysis"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      - name: Run Linters & Type Checks
-        run: echo "Static analysis (lint, type-checking, dependency checks) running..."
-
-  regression-tests:
-    name: "Gate 5: Regression Gate"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      - name: Run Deterministic Offline Test Suites
-        run: echo "Executing test/offline/ suites..."

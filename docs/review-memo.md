@@ -1,10 +1,21 @@
 # Review memos
 
 **Purpose:** for each PR, record whether it is aligned with the specification and architecture, whether code and test quality are acceptable, and the verdict.
-**Owner:** Member 5 (QA & Governance); every reviewer writes their own memo section.
+**Owner (template):** Member 5 (QA & Governance).
+**Author of each memo:** the **reviewer of that PR, never its author.** The default reviewer is the PM (Member 1); Member 5 reviews any PR the PM authors. A reviewer may not write the memo for their own change.
 **Rule:** the memo reviews **governance**, not every line. A P0 finding must cite the invariant or ADR it violates; a P0 without a citation is a style opinion and must be downgraded to P2.
 
 **Verdict vocabulary:** `APPROVE` / `CHANGES REQUIRED` / `REJECT`. No other value is valid.
+
+## 0. Who reviews whom
+
+| PR author | Reviewer (writes the memo) |
+|---|---|
+| A teammate (Member 2/3/4) | PM (Member 1) |
+| PM (Member 1) | Member 5 |
+| Member 5 | PM (Member 1) |
+
+Each PR has exactly **one** reviewer and **one** memo section. The author fills the PR description (requirements, files, tests); the reviewer fills the memo (findings, verdict). Independence is mandatory: author ≠ reviewer. If neither the PM nor Member 5 is available, the PR waits rather than self-approving.
 
 ## 1. Index
 
@@ -24,7 +35,7 @@ There are **zero** merged code or prompt PRs at baseline. The baseline documenta
 | Commit range | `<abc123>..<def456>` |
 | Author / reviewer | `<author>` / `<reviewer>` |
 | Date | `<YYYY-MM-DD>` |
-| Linked requirements | `REQ-LANG-...` |
+| Linked requirements | `INV-` / `FR-` / `NFR-...` |
 | Linked ADR / invariants | `ADR-NNN` / `INV-NNN` |
 | Plan approval | `<artifact id, approver, timestamp>` |
 | AI use log | `S-NNN` |
@@ -77,7 +88,7 @@ There are **zero** merged code or prompt PRs at baseline. The baseline documenta
 
 | ID | Severity (`P0`/`P1`/`P2`) | File:line | Finding | Cited invariant/ADR | Resolution |
 |---|---|---|---|---|---|
-| F-01 | P1 | `src/foo.py:42` | ... | `INV-001`, ADR-005 §Decision | fixed in `<commit>` / `DBT-NNN` |
+| F-01 | P1 | `src/foo.py:42` | ... | `INV-CITE-001`, ADR-005 §Decision | fixed in `<commit>` / `DBT-NNN` |
 
 - **P0** blocks the merge: an invariant or authority violation, a secret, a cross-user path, a gate bypass.
 - **P1** must be fixed before merge or moved to `debt-register.md` with an owner and trigger.
@@ -93,7 +104,7 @@ One paragraph: why this verdict, which findings drove it, and what would change 
 2. **Evidence over assertion:** "tests pass" is not a review finding; the CI run id and the command are.
 3. **P0 citation:** a P0 must name the invariant or ADR it violates. If it cannot, downgrade it.
 4. **Frozen paths:** a change to `docs/req/requirements.yaml`, an accepted ADR, the blueprint, CI, prompts or permissions requires a human author and an ADR; the memo must record the approval id.
-5. **AI log:** a code or prompt PR without a new `docs/ai-use-log.yaml` session is a P0 for the process, not a P2.
+5. **AI log:** a code or prompt PR without a new `docs/code-governance/ai-use-log.yaml` session is a P0 for the process, not a P2.
 6. **Resolution:** every P0/P1 is either fixed in the PR or moved to `debt-register.md` with a `DBT-*` id before merge. An open P0 is never merged.
 7. **Retrospective:** if a defect escapes, the review memo is updated with the missed finding and a link to the bug diary entry.
 

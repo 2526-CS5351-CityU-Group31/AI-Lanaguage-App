@@ -6,7 +6,7 @@
 
 ## 2. Dependency Constraints
 - No unapproved third-party packages may be added without explicit human approval and verification against hallucinated dependencies.
-- Deterministic safety boundary modules (`src/backend/safety/`) must only depend on standard library modules or vetted deterministic validation libraries—never on live LLM calls.
+- Deterministic safety boundary modules (`src/backend/safety_boundary/`) must only depend on standard library modules or vetted deterministic validation libraries—never on live LLM calls.
 
 ## 3. Test Independence
 - Every requirement fit criterion must have at least one automated test.
