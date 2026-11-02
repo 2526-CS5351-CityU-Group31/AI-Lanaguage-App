@@ -182,3 +182,12 @@ sessions:
     files_touched:
       - "AGENTS.md"
     human_interventions: "Agent identified that AGENTS.md reading-order step 3 pointed to a non-existent docs/architecture/architecture-blueprint.md; human applied the fix to reference architecture-blueprint.md at the repository root. Agent verified the path resolves and no stale references remain. This completes Tier B."
+  - session_id: "SES-020"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B-ext A: full SSOT remap of architecture-blueprint.md - 19 flat elements to 18 nested modules, 8 legacy invariants to 13 SSOT invariants, drop quiz/publication sections, fix thresholds/paths/IDs."
+    files_touched:
+      - "architecture-blueprint.md"
+    human_interventions: "Human chose the full SSOT remap. Agent rewrote scope (dropped quiz/publish), drivers (SSOT clusters), guarantees (13 invariants), boundaries/components/authority (18 nested modules), permissions, verification thresholds (NFR-* + 1,500 tokens), observability, change policy, filesystem and Appendix A; verified no legacy REQ-LANG/numeric-INV/defunct module names and all IDs resolve to SSOT."
