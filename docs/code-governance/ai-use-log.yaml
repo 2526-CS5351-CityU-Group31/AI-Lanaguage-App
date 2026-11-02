@@ -52,3 +52,12 @@ sessions:
     files_touched:
       - "docs/code-governance/structural-constraints.md"
     human_interventions: "Human approved the drafted module table and rule text before the agent wrote it. Agent verified all 18 code modules match SSOT enforcing_component paths (ci.yml correctly excluded as non-module) and that no legacy REQ-LANG/INV-### references remain."
+  - session_id: "SES-006"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B consolidation step 4: rewrite verification-constraints.md to 31-requirement counts, SSOT NFR/INV thresholds, and rebuilt VS table."
+    files_touched:
+      - "docs/code-governance/verification-constraints.md"
+    human_interventions: "Human approved the drafted verification-constraints content before the agent wrote it. Agent verified every referenced ID resolves to the SSOT, thresholds match requirements.yaml verbatim, counts are 31/30/13/18, and no legacy REQ-LANG/numeric-INV refs remain."
