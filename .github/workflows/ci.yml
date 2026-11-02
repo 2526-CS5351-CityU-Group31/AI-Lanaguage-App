@@ -78,6 +78,26 @@ jobs:
           fi
           echo "AI-use log gate passed."
 
+      - name: Validate AI-Use Log Schema
+        run: |
+          pip install jsonschema pyyaml
+          python - << 'EOF'
+          import json, yaml, sys
+          from jsonschema import validate, ValidationError
+
+          try:
+              with open('docs/code-governance/ai-use-log-schema.json', 'r') as sf:
+                  schema = json.load(sf)
+              with open('docs/code-governance/ai-use-log.yaml', 'r') as lf:
+                  log_data = yaml.safe_load(lf)
+              validate(instance=log_data, schema=schema)
+              print("AI-use log schema is valid.")
+          except Exception as e:
+              print(f"::error::ai-use-log.yaml failed schema validation: {e}", file=sys.stderr)
+              sys.exit(1)
+          EOF
+
+
   # Placeholders for Gates 1, 2, 4, 5 (Expand as src/ and test/ suites are built)
   static-analysis:
     name: "Gate 2: Static Analysis"
