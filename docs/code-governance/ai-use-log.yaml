@@ -43,3 +43,12 @@ sessions:
     files_touched:
       - "docs/architecture/trace-matrix.md"
     human_interventions: "Human reviewed the generated 31-row matrix inline and approved before the agent wrote it. Agent verified ID set matches the SSOT exactly (31/31, no missing, extra, or duplicate rows)."
+  - session_id: "SES-005"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B consolidation step 3: rewrite structural-constraints.md to the nested src/backend module layout (18 SSOT modules), import contracts C1-C7, SSOT IDs."
+    files_touched:
+      - "docs/code-governance/structural-constraints.md"
+    human_interventions: "Human approved the drafted module table and rule text before the agent wrote it. Agent verified all 18 code modules match SSOT enforcing_component paths (ci.yml correctly excluded as non-module) and that no legacy REQ-LANG/INV-### references remain."
