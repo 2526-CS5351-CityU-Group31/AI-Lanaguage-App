@@ -155,3 +155,12 @@ sessions:
       - "docs/architecture/evaluation-logbook.md"
       - "docs/architecture/evaluation-table.md"
     human_interventions: "Human approved the risk-list register rewrite and the batch approach. Agent removed uncovered risks R-004/R-007/R-010, remapped mitigations to SSOT modules, pruned option-ledger US$0.04/quiz/ARCH-003 references, appended L-013 to the append-only logbook (history rows kept), and reworded evaluation-table D5. Verified no unknown IDs; the only remaining REQ-LANG is in preserved history (L-004) and is annotated by L-013. This completes Item 6."
+  - session_id: "SES-017"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B step 7: reconcile configuration-governance.md to the 1,500-token budget; remove uncovered cost/retention/content-admin keys; add COMPACTION_MESSAGE_LIMIT; fix module paths and RP IDs."
+    files_touched:
+      - "docs/architecture/configuration-governance.md"
+    human_interventions: "Human chose COMPACTION_MESSAGE_LIMIT=6. Agent set CONTEXT_TOKEN_BUDGET default to 1500 (NFR-COST-001), removed MAX_SESSION_COST_USD/OUTPUT_TOKEN_RESERVE/retention keys/FEATURE_CONTENT_ADMIN, replaced COMPACTION_THRESHOLD with COMPACTION_MESSAGE_LIMIT, fixed module paths, and remapped the policy table to new RP IDs; verified no 8k/removed keys/old RP IDs remain."
