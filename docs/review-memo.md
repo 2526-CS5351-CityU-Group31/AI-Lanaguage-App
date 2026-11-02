@@ -24,7 +24,7 @@ There are **zero** merged code or prompt PRs at baseline. The baseline documenta
 | Commit range | `<abc123>..<def456>` |
 | Author / reviewer | `<author>` / `<reviewer>` |
 | Date | `<YYYY-MM-DD>` |
-| Linked requirements | `REQ-LANG-...` |
+| Linked requirements | `INV-` / `FR-` / `NFR-...` |
 | Linked ADR / invariants | `ADR-NNN` / `INV-NNN` |
 | Plan approval | `<artifact id, approver, timestamp>` |
 | AI use log | `S-NNN` |
@@ -77,7 +77,7 @@ There are **zero** merged code or prompt PRs at baseline. The baseline documenta
 
 | ID | Severity (`P0`/`P1`/`P2`) | File:line | Finding | Cited invariant/ADR | Resolution |
 |---|---|---|---|---|---|
-| F-01 | P1 | `src/foo.py:42` | ... | `INV-001`, ADR-005 §Decision | fixed in `<commit>` / `DBT-NNN` |
+| F-01 | P1 | `src/foo.py:42` | ... | `INV-CITE-001`, ADR-005 §Decision | fixed in `<commit>` / `DBT-NNN` |
 
 - **P0** blocks the merge: an invariant or authority violation, a secret, a cross-user path, a gate bypass.
 - **P1** must be fixed before merge or moved to `debt-register.md` with an owner and trigger.
