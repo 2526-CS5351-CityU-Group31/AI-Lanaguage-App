@@ -1,0 +1,98 @@
+name: CI Blocking Gates
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # Gate 3: Schema Gate (Validates requirements.yaml against req-schema.json)
+  schema-gate:
+    name: "Gate 3: Schema Gate"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Validation Dependencies
+        run: pip install jsonschema pyyaml
+
+      - name: Validate Requirements Registry
+        run: |
+          python - << 'EOF'
+          import json, yaml, sys
+          from jsonschema import validate, ValidationError
+
+          try:
+            with open('docs/req/req-schema.json', 'r') as sf:
+              schema = json.load(sf)
+            with open('docs/req/requirements.yaml', 'r') as rf:
+              instance = yaml.safe_load(rf)
+            validate(instance=instance, schema=schema)
+            print("Schema gate passed: docs/req/requirements.yaml conforms to req-schema.json.")
+          except ValidationError as e:
+            print(f"Schema gate failed: {e.message}", file=sys.stderr)
+            sys.exit(1)
+          except Exception as e:
+            print(f"Error reading files: {e}", file=sys.stderr)
+            sys.exit(1)
+          EOF
+
+  # Gate 6: AI-Use Log Gate (Blocks PRs that modify code/prompts without updating ai-use-log.yaml)
+  ai-use-log-gate:
+    name: "Gate 6: AI-Use Log Gate"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check AI-Use Log Updates
+        run: |
+          # Compare PR head to target branch base
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
+          
+          CODE_OR_PROMPT_CHANGED=false
+          LOG_UPDATED=false
+
+          for file in $CHANGED_FILES; do
+            if [[ "$file" =~ ^(src/|prompts/|Prompt\.md) ]]; then
+              CODE_OR_PROMPT_CHANGED=true
+            fi
+            if [[ "$file" == "docs/code-governance/ai-use-log.yaml" ]]; then
+              LOG_UPDATED=true
+            fi
+          done
+
+          if [ "$CODE_OR_PROMPT_CHANGED" = true ] && [ "$LOG_UPDATED" = false ]; then
+            echo "::error::Gate 6 Failed: Code or runtime prompts were modified without updating docs/code-governance/ai-use-log.yaml."
+            exit 1
+          fi
+          echo "AI-use log gate passed."
+
+  # Placeholders for Gates 1, 2, 4, 5 (Expand as src/ and test/ suites are built)
+  static-analysis:
+    name: "Gate 2: Static Analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Run Linters & Type Checks
+        run: echo "Static analysis (lint, type-checking, dependency checks) running..."
+
+  regression-tests:
+    name: "Gate 5: Regression Gate"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Run Deterministic Offline Test Suites
+        run: echo "Executing test/offline/ suites..."

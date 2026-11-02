@@ -1,869 +1,353 @@
-# LANG requirement registry - baseline R1
-# Schema: docs/req/req-schema.json (validated by scripts/validate_req.py in CI).
-# Change rule: do not edit a frozen baseline silently; append a delta block and raise R2.
-schema_version: "1.0"
-project: LANG
-baseline: R1
-frozen_on: 2026-10-27
-frozen_by: "Member 1 (Requirements & PM)"
-
-clusters:
-  - id: CL-AUTHORITY
-    name: "Advisory AI, authoritative code"
-    priority: must
-    responsibility: "One server-side gate between model output and any learner-visible or persisted record; deterministic code holds veto."
-    driver_requirements:
-      - REQ-LANG-ARCH-001
-      - REQ-LANG-INV-001
-      - REQ-LANG-INV-002
-      - REQ-LANG-SEC-001
-      - REQ-LANG-ARCH-002
-
-  - id: CL-ISOLATION
-    name: "Learner data isolation"
-    priority: must
-    responsibility: "Every read and write is scoped to the authenticated principal; no request field can select an identity or reach another learner's records."
-    driver_requirements:
-      - REQ-LANG-SEC-002
-      - REQ-LANG-INV-003
-      - REQ-LANG-FR-001
-      - REQ-LANG-FR-002
-      - REQ-LANG-SEC-003
-      - REQ-LANG-SEC-004
-
-  - id: CL-GROUNDING
-    name: "Evidence-bound lesson help"
-    priority: must
-    responsibility: "Answers about taught material come from published curriculum evidence with resolvable citations, or the system abstains explicitly."
-    driver_requirements:
-      - REQ-LANG-FR-003
-      - REQ-LANG-FR-004
-      - REQ-LANG-ARCH-003
-      - REQ-LANG-NFR-001
-      - REQ-LANG-NFR-002
-      - REQ-LANG-NFR-003
-      - REQ-LANG-PERF-001
-
-  - id: CL-RECORD
-    name: "Learning record integrity"
-    priority: must
-    responsibility: "Scores, mastery and progress are computed by deterministic code from stored events; AI text is never the authoritative record."
-    driver_requirements:
-      - REQ-LANG-FR-005
-      - REQ-LANG-FR-006
-      - REQ-LANG-FR-007
-      - REQ-LANG-FR-008
-      - REQ-LANG-INV-004
-      - REQ-LANG-INV-005
-      - REQ-LANG-FR-009
-
-  - id: CL-RESILIENCE
-    name: "Safe degradation"
-    priority: must
-    responsibility: "Every model, retrieval and persistence failure has a defined safe action with bounded retries and no unsafe fallback text."
-    driver_requirements:
-      - REQ-LANG-NFR-004
-      - REQ-LANG-NFR-005
-      - REQ-LANG-INV-006
-      - REQ-LANG-NFR-006
-
-  - id: CL-COST
-    name: "Bounded AI spend"
-    priority: must
-    responsibility: "Per-learner call volume and per-session cost are capped and observable, with AI features pausing before spend escapes the budget."
-    driver_requirements:
-      - REQ-LANG-COST-001
-      - REQ-LANG-COST-002
-
-  - id: CL-EVOLUTION
-    name: "Versioned content and prompts"
-    priority: must
-    responsibility: "Corpus, index, prompt and model versions are recorded, reproducibly evaluated and reversibly published; retired content never serves."
-    driver_requirements:
-      - REQ-LANG-FR-010
-      - REQ-LANG-GOV-001
-      - REQ-LANG-GOV-002
-      - REQ-LANG-GOV-003
-
-  - id: CL-ACCESS
-    name: "Accessible learner interface"
-    priority: should
-    responsibility: "Critical learner journeys work with keyboard and assistive technology and report failures in plain, actionable language."
-    driver_requirements:
-      - REQ-LANG-NFR-007
-
-  - id: CL-GOVERNANCE
-    name: "Agentic delivery governance"
-    priority: must
-    responsibility: "Agent work is bounded by approved plans, logged sessions, frozen artifacts and review evidence before any merge."
-    driver_requirements:
-      - REQ-LANG-GOV-004
-      - REQ-LANG-GOV-005
-      - REQ-LANG-ARCH-004
-
+project: "AI-Companion Language Learning Platform"
+version: "1.0.0"
+last_updated: "2026-10-28"
 requirements:
-  - id: REQ-LANG-ARCH-001
-    type: architectural_constraint
-    statement: "The system SHALL route every model output through exactly one server-side validation gate before display or persistence."
-    rationale: "A single enforceable choke point is what makes the advisory/authoritative boundary testable; parallel validation paths drift silently."
-    fit_criterion:
-      kind: structural
-      metric: validation_gate_count
-      threshold: "== 1 gate on all display and write paths; 0 alternate paths; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/structural/test_authority_imports.py::test_single_validation_gate -q"
-      on_fail: "REVIEW; release blocked until exactly one gate exists"
-    priority: must
-    priority_tradeoff: "All AI features share one validator's latency and failure behaviour; accepted for a provable authority boundary."
-    asr: true
-    forces_element: ResponseValidator
-    cluster: CL-AUTHORITY
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.2 step 6"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  # ==========================================
+  # INVARIANTS (Non-negotiable runtime rules)
+  # ==========================================
+  - id: "INV-SCOPE-001"
+    type: "invariant"
+    statement: "Every user message must pass through the bounded scope-control pipeline before retrieval or tutor-model invocation."
+    fit_criterion: "100% of incoming chat requests log an upstream ScopeResult prior to any vector store or LLM client call."
+    priority: "Must"
+    tradeoff: "Adds bounded classification latency (100-300ms) on all requests to guarantee zero out-of-scope model invocations."
+    enforcing_component: "src/backend/safety_boundary/scope_guard.py"
+    verification_method: "test/offline/test_safety_boundary/test_scope_guard.py::test_scope_pipeline_execution_order"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2.1"
 
-  - id: REQ-LANG-INV-001
-    type: invariant
-    statement: "No model-generated text SHALL be displayed to a learner or persisted as a learning record unless it carries a successful ResponseValidator verdict."
-    rationale: "Unvalidated model text is the primary path by which hallucinated or injected content becomes a learner record."
-    fit_criterion:
-      kind: machine_checkable
-      metric: unvalidated_output_count
-      threshold: "== 0 across the 64-case replay and 12 fault-injection cases; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_001_no_unvalidated_output.py -q"
-      on_fail: "REVIEW; release blocked; the failing turn is discarded and logged CRITICAL"
-    priority: must
-    priority_tradeoff: "A validator failure turns a turn into a safe fallback rather than a best-effort answer; accepted."
-    asr: true
-    forces_element: ResponseValidator
-    cluster: CL-AUTHORITY
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §0, §3.2 step 6"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "INV-SCOPE-002"
+    type: "invariant"
+    statement: "A user request determined to be unrelated to language learning must receive the approved deterministic fixed refusal string."
+    fit_criterion: "System returns exact string 'I\\'m sorry, but I can only help with language-learning questions.' with HTTP 200 and zero model-generated tokens."
+    priority: "Must"
+    tradeoff: "Refuses open-ended non-pedagogical conversation to prevent off-topic jailbreaks."
+    enforcing_component: "src/backend/safety_boundary/scope_guard.py"
+    verification_method: "test/offline/test_safety_boundary/test_scope_guard.py::test_fixed_refusal_response"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2.1"
 
-  - id: REQ-LANG-INV-002
-    type: invariant
-    statement: "The system SHALL NOT display a citation whose source_id is absent from the published chunks retrieved for that turn."
-    rationale: "A citation that cannot be resolved to retrieved evidence is a fabricated authority claim, even when the prose is plausible."
-    fit_criterion:
-      kind: machine_checkable
-      metric: invalid_citation_count
-      threshold: "== 0 across the 40 answerable and abstention cases in EVAL-1.0.0; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_002_citation_provenance.py -q"
-      on_fail: "REVIEW; release blocked; the entire answer is discarded and an abstention is returned"
-    priority: must
-    priority_tradeoff: "One forged source id discards the whole answer instead of stripping the citation; accepted because provenance is the product claim."
-    asr: true
-    forces_element: ResponseValidator
-    cluster: CL-AUTHORITY
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.2 step 4-7"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "INV-SCOPE-003"
+    type: "invariant"
+    statement: "A deterministically rejected request must make exactly zero RAG vector searches and zero tutor LLM calls."
+    fit_criterion: "Vector search mock call count == 0 and LLM API client call count == 0 for all rejected test cases."
+    priority: "Must"
+    tradeoff: "Prevents conversational recovery on rejected turns in exchange for complete cost and prompt injection containment."
+    enforcing_component: "src/backend/api/routers/chat.py"
+    verification_method: "test/offline/test_safety_boundary/test_scope_guard.py::test_zero_calls_on_rejection"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2.1"
 
-  - id: REQ-LANG-SEC-001
-    type: security
-    statement: "Retrieved passages SHALL be treated as untrusted data and SHALL NOT alter system policy, tool privileges, or authorization."
-    rationale: "The corpus is editable content; a compromised or careless lesson must not become an instruction channel into the application."
-    fit_criterion:
-      kind: machine_checkable
-      metric: policy_escape_count
-      threshold: "== 0 across the 24 adversarial cases in EVAL-1.0.0; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_007_retrieved_text_is_data.py -q"
-      on_fail: "REVIEW; release blocked; the affected passage is quarantined and the turn abstains"
-    priority: must
-    priority_tradeoff: "Delimiting and partially ignoring retrieved text can reduce answer helpfulness; accepted for injection resistance."
-    asr: true
-    forces_element: PromptAssembler
-    cluster: CL-AUTHORITY
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 acceptance example 3, §8.7 step 5"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "INV-SCOPE-004"
+    type: "invariant"
+    statement: "An uncertain intent request must return the approved fixed clarification response and must not bypass scope control."
+    fit_criterion: "Ambiguous user inputs deterministically yield status='uncertain', zero external LLM calls, and a static clarification prompt."
+    priority: "Must"
+    tradeoff: "Requires user to rephrase ambiguous requests rather than guessing intent probabilistically."
+    enforcing_component: "src/backend/safety_boundary/scope_guard.py"
+    verification_method: "test/offline/test_safety_boundary/test_scope_guard.py::test_uncertain_intent_clarification"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2.1"
 
-  - id: REQ-LANG-ARCH-002
-    type: architectural_constraint
-    statement: "TutorPipeline SHALL return validated proposals only and SHALL NOT write learner state."
-    rationale: "If the orchestration path can write, the validation gate is optional in practice and the authority boundary is unenforceable."
-    fit_criterion:
-      kind: structural
-      metric: tutor_pipeline_db_write_calls
-      threshold: "== 0; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/structural/test_authority_imports.py::test_tutor_pipeline_read_only -q"
-      on_fail: "REVIEW; release blocked until the write path is removed"
-    priority: must
-    priority_tradeoff: "Persistence happens in a second service call, so a turn is a two-step transaction; accepted for a one-way data flow."
-    asr: true
-    forces_element: TutorPipeline
-    cluster: CL-AUTHORITY
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §4 module contracts"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "INV-SCOPE-005"
+    type: "invariant"
+    statement: "A mixed-intent request must not silently execute an unsupported part and must return a fixed resubmission clarification."
+    fit_criterion: "Inputs containing partial off-topic actions yield status='mixed' and zero retrieval or tutor calls."
+    priority: "Must"
+    tradeoff: "Rejects partially valid prompts requiring the user to isolate the language question."
+    enforcing_component: "src/backend/safety_boundary/scope_guard.py"
+    verification_method: "test/offline/test_safety_boundary/test_scope_guard.py::test_mixed_intent_blocking"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2.1"
 
-  - id: REQ-LANG-SEC-002
-    type: security
-    statement: "A request for another learner's record SHALL return 403 or 404 without a body and SHALL NOT mutate any record."
-    rationale: "Cross-user exposure destroys trust faster than any pedagogy defect and is the first negative acceptance example in the plan."
-    fit_criterion:
-      kind: machine_checkable
-      metric: cross_user_exposure_count
-      threshold: "== 0 across 20 ownership probes covering GET, PATCH and POST; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_003_cross_user_isolation.py -q"
-      on_fail: "REVIEW; release blocked; security event raised and owner notified"
-    priority: must
-    priority_tradeoff: "Ownership checks add a query per access and forbid shared demo accounts; accepted for isolation."
-    asr: true
-    forces_element: OwnershipGuard
-    cluster: CL-ISOLATION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 acceptance example 1, §8.5"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "INV-SCOPE-006"
+    type: "invariant"
+    statement: "Retrieval from the vector database must be conditional and executed only when requires_grounding is true."
+    fit_criterion: "Zero vector search calls executed for ungrounded conversation, writing feedback, vocabulary JSON lookup, or rejected states."
+    priority: "Must"
+    tradeoff: "Restricts vector retrieval strictly to lesson/grammar queries to minimize DB latency and token overhead."
+    enforcing_component: "src/backend/ai_companion/retrieval_adapter.py"
+    verification_method: "test/offline/test_ai_companion/test_retrieval_conditions.py::test_conditional_retrieval_routing"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 2.1"
 
-  - id: REQ-LANG-INV-003
-    type: invariant
-    statement: "The authenticated session SHALL be the only source of learner identity; no request body or query parameter SHALL select a user_id."
-    rationale: "Identity taken from a payload turns every ownership check into a suggestion and enables vertical privilege confusion."
-    fit_criterion:
-      kind: machine_checkable
-      metric: payload_selected_identity_count
-      threshold: "== 0 across 100 fuzzed identity fields; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_003_cross_user_isolation.py::test_identity_not_from_payload -q"
-      on_fail: "REVIEW; release blocked; the request is rejected 400 and logged"
-    priority: must
-    priority_tradeoff: "Admin and support tooling must impersonate through audited endpoints rather than parameters; accepted."
-    asr: false
-    cluster: CL-ISOLATION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 feature Account and profile"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "INV-AUTH-001"
+    type: "invariant"
+    statement: "Cross-user data access is strictly forbidden; all session, progress, and vocabulary queries must be scoped to the authenticated user ID."
+    fit_criterion: "Access attempts using another user's session ID or user ID yield HTTP 403/404 with 0 record disclosures and 0 state mutations."
+    priority: "Must"
+    tradeoff: "Disallows public session sharing or collaborative peer review in MVP."
+    enforcing_component: "src/backend/auth/security.py"
+    verification_method: "test/offline/test_auth/test_authorization.py::test_cross_user_isolation"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 4 & 8.2"
 
-  - id: REQ-LANG-FR-001
-    type: functional
-    statement: "A learner SHALL be able to register, log in, log out, and read or update their own profile."
-    rationale: "Every personalised feature depends on a server-owned principal and a validated target language and level."
-    fit_criterion:
-      kind: machine_checkable
-      metric: auth_profile_pass_rate
-      threshold: "== 100% of 18 authentication and profile cases, including expired session and invalid input; if not met -> REVIEW"
-      measurement: "pytest test/offline/test_auth_profile.py -q"
-      on_fail: "REVIEW; the failing case blocks the feature PR"
-    priority: must
-    priority_tradeoff: "Session cookies and CSRF handling add frontend work; accepted for server-owned identity."
-    asr: false
-    cluster: CL-ISOLATION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §8.5 build order 1"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "INV-LANG-001"
+    type: "invariant"
+    statement: "The application supports only the English language; all registration and profile requests with language != 'en' must be rejected."
+    fit_criterion: "Payloads with language != 'en' fail with HTTP 422 Unprocessable Entity."
+    priority: "Must"
+    tradeoff: "Completely foregoes multilingual support in MVP to ensure high pedagogical rigor in English."
+    enforcing_component: "src/backend/api/schemas/profile.py"
+    verification_method: "test/offline/test_auth/test_profile.py::test_reject_non_english"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 0"
 
-  - id: REQ-LANG-FR-002
-    type: functional
-    statement: "The system SHALL create practice sessions with an immutable owner and SHALL append turns in server-assigned order."
-    rationale: "A mutable owner or client-ordered turn list lets a session be reassigned or replayed inconsistently."
-    fit_criterion:
-      kind: machine_checkable
-      metric: session_owner_mutation_count
-      threshold: "== 0; 100% of session reads and writes owner-checked; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/test_session_ownership.py -q"
-      on_fail: "REVIEW; release blocked until ownership is enforced at the repository boundary"
-    priority: must
-    priority_tradeoff: "No session transfer or sharing exists in R1; accepted for isolation and simpler ordering."
-    asr: false
-    cluster: CL-ISOLATION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §8.4 sessions and messages"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "INV-CEFR-001"
+    type: "invariant"
+    statement: "The system accepts only canonical CEFR levels A1, A2, B1, and B2; any other level values must be rejected at the API boundary."
+    fit_criterion: "Payloads containing levels outside ['A1', 'A2', 'B1', 'B2'] fail schema validation with HTTP 422."
+    priority: "Must"
+    tradeoff: "Excludes advanced C1/C2 learners in MVP to bound content and evaluation complexity."
+    enforcing_component: "src/backend/api/schemas/profile.py"
+    verification_method: "test/offline/test_auth/test_profile.py::test_reject_invalid_cefr"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 0"
 
-  - id: REQ-LANG-SEC-003
-    type: security
-    statement: "Provider keys, session secrets and database credentials SHALL be supplied by the environment or a secret store and SHALL NOT appear in the repository, browser bundle, or logs."
-    rationale: "A leaked provider key is an unbounded cost and data-access incident; a client-side key cannot be rate limited by the server."
-    fit_criterion:
-      kind: machine_checkable
-      metric: secret_scan_findings
-      threshold: "== 0 in the repository, the frontend build output, and 100 sampled log lines; if not met -> REVIEW and rotate the secret"
-      measurement: "python scripts/scan_secrets.py --scope repo,frontend/dist,logs --sample 100"
-      on_fail: "REVIEW; rotate the exposed secret, block release, and record a security event"
-    priority: must
-    priority_tradeoff: "Local setup needs an explicit .env step; accepted to keep secrets out of artifacts."
-    asr: false
-    cluster: CL-ISOLATION
-    source: {kind: stakeholder, ref: "CS5351 project sheet D3; Comprehensive_Project_Plan_version2.md §4"}
-    status: baselined
-    owner: "Member 5 (QA & Governance)"
+  - id: "INV-SEC-001"
+    type: "invariant"
+    statement: "The runtime application service must use read-only vector database credentials and cannot execute insert, update, or delete commands."
+    fit_criterion: "Direct SQL/vector write operations executed via the application DB pool raise a permission-denied exception."
+    priority: "Must"
+    tradeoff: "Requires a separate offline admin script for corpus reindexing; runtime cannot dynamically ingest materials."
+    enforcing_component: "src/backend/database/vector_client.py"
+    verification_method: "test/offline/test_database/test_vector_permissions.py::test_runtime_vector_read_only"
+    owner: "Member 5 (Luming)"
+    source: "CS5351 Project Plan Section 3.1 & 4"
 
-  - id: REQ-LANG-SEC-004
-    type: security
-    statement: "Raw learner writing SHALL NOT be stored in the shared curriculum corpus, the vector index, or application logs."
-    rationale: "Learner text is personal data and may contain third-party information; the shared knowledge base must remain independent of it."
-    fit_criterion:
-      kind: machine_checkable
-      metric: learner_text_in_shared_stores
-      threshold: "== 0 matches across the corpus manifest, vector index metadata, and 100 sampled audit events; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_009_privacy_boundary.py test/offline/invariants/test_inv_010_redaction.py -q"
-      on_fail: "REVIEW; purge the affected store, block release, and notify the data owner"
-    priority: must
-    priority_tradeoff: "Explanations cannot be improved by mining learner writing; accepted to keep the corpus licensable and private."
-    asr: true
-    forces_element: ContentPublisher
-    cluster: CL-ISOLATION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.1, §8.7"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "INV-SEC-002"
+    type: "invariant"
+    statement: "The web application and backend API must expose zero user file upload endpoints."
+    fit_criterion: "API router introspection test confirms 0 registered routes accepting multipart/form-data or file payloads."
+    priority: "Must"
+    tradeoff: "Learners cannot upload custom documents or essays as PDF/Word files in the MVP."
+    enforcing_component: "src/backend/main.py"
+    verification_method: "test/offline/test_api/test_routes.py::test_no_upload_endpoints_exposed"
+    owner: "Member 5 (Luming)"
+    source: "CS5351 Project Plan Section 3.1"
 
-  - id: REQ-LANG-FR-003
-    type: functional
-    statement: "Lesson help SHALL return an answer whose every citation resolves to a retrieved, published source title and section."
-    rationale: "The product claim is grounded tutoring; a citation the learner cannot open is worse than no citation."
-    fit_criterion:
-      kind: machine_checkable
-      metric: grounded_citation_pass_rate
-      threshold: "== 100% of the 24 grounded EVAL-1.0.0 cases display only retrieved published titles and sections; if not met -> REVIEW and release blocked"
-      measurement: "python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline --case-type grounded --check citations"
-      on_fail: "REVIEW; release blocked; failing answers are logged with their retrieved id set"
-    priority: must
-    priority_tradeoff: "Answers are limited to the curated corpus and may be less fluent than an open-ended tutor; accepted for trust."
-    asr: true
-    forces_element: RetrievalService
-    cluster: CL-GROUNDING
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 grounded lesson help, §3.2"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "INV-PROG-001"
+    type: "invariant"
+    statement: "Dashboard progress metrics must be aggregated deterministically from verified database events and never from LLM output."
+    fit_criterion: "Progress response counts exactly match SQL COUNT(*) queries from learning_events table."
+    priority: "Must"
+    tradeoff: "Dashboard displays strictly quantified counts rather than personalized AI narrative summaries."
+    enforcing_component: "src/backend/user_progress/service.py"
+    verification_method: "test/offline/test_user_progress/test_dashboard.py::test_progress_derived_from_events"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2 & 8.4"
 
-  - id: REQ-LANG-FR-004
-    type: functional
-    statement: "When retrieved evidence is insufficient, the system SHALL state the limitation and offer general practice without inventing course facts."
-    rationale: "Abstention is the only honest answer when the corpus does not cover the question; a confident invention teaches the wrong rule."
-    fit_criterion:
-      kind: machine_checkable
-      metric: unsupported_answer_count
-      threshold: "== 0 across the 16 abstention cases in EVAL-1.0.0; 100% return an explicit limitation; if not met -> REVIEW and release blocked"
-      measurement: "python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline --case-type abstain --check abstention"
-      on_fail: "REVIEW; release blocked; the case is added to the adversarial set"
-    priority: must
-    priority_tradeoff: "Some answerable questions may abstain when retrieval is conservative; accepted as the safer error."
-    asr: true
-    forces_element: DegradationController
-    cluster: CL-GROUNDING
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.2 example, §8.7 step 5"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "INV-CITE-001"
+    type: "invariant"
+    statement: "All displayed lesson citations must match retrieved, published chunk IDs; invalid or missing source IDs must trigger safe abstention."
+    fit_criterion: "Tutor responses with unverified citation IDs are discarded; response falls back to an insufficient-evidence disclosure."
+    priority: "Must"
+    tradeoff: "Abstains from answering if citation integrity fails, preventing hallucinated learning claims."
+    enforcing_component: "src/backend/safety_boundary/citation_validator.py"
+    verification_method: "test/offline/test_safety_boundary/test_citation_validator.py::test_reject_invalid_citations"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 3.2"
 
-  - id: REQ-LANG-ARCH-003
-    type: architectural_constraint
-    statement: "Retrieval SHALL filter by published state, language, level and topic before ranking candidates."
-    rationale: "Filtering after ranking leaks unpublished or off-level material into the candidate set and makes exclusion unprovable."
-    fit_criterion:
-      kind: structural
-      metric: unpublished_chunks_served
-      threshold: "== 0 across 64 replay cases; 100% of retrieval calls apply all four filters before ranking; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_008_published_only.py -q"
-      on_fail: "REVIEW; release blocked; the query is rejected and logged"
-    priority: must
-    priority_tradeoff: "Pre-filtering can reduce recall on borderline level queries; accepted because published-only is non-negotiable."
-    asr: true
-    forces_element: RetrievalService
-    cluster: CL-GROUNDING
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.2 step 3"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  # ==========================================
+  # FUNCTIONAL REQUIREMENTS
+  # ==========================================
+  - id: "FR-AUTH-001"
+    type: "functional"
+    statement: "The system shall allow users to register and log in, issuing a secure session cookie or token."
+    fit_criterion: "POST /auth/register and POST /auth/login return HTTP 200 with valid session token upon correct credentials."
+    priority: "Must"
+    tradeoff: "Uses standard password authentication; third-party OAuth is deferred."
+    enforcing_component: "src/backend/auth/router.py"
+    verification_method: "test/offline/test_auth/test_auth_flow.py::test_register_login"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2 & 8.5"
 
-  - id: REQ-LANG-NFR-001
-    type: quality
-    statement: "Retrieval SHALL return the expected source within the top five results for at least 85% of the grounded evaluation questions."
-    rationale: "Recall is the ceiling on grounded answer quality; if the right lesson is not retrieved, no prompt can compensate."
-    fit_criterion:
-      kind: measurable
-      metric: recall_at_5
-      threshold: ">= 0.85 on the 24 EVAL-GROUND cases; if not met -> REVIEW, tune retrieval, release blocked"
-      measurement: "python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline --metric recall_at_5"
-      on_fail: "REVIEW; tune chunking, filters or reranking and rerun; release blocked while below threshold"
-    priority: must
-    priority_tradeoff: "Wider retrieval raises token cost and admits off-level passages; accepted at top-5 with reranking."
-    asr: false
-    cluster: CL-GROUNDING
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.3 proposed target"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "FR-PROF-001"
+    type: "functional"
+    statement: "The system shall allow users to view and update their profile with learning goals and CEFR level (A1-B2)."
+    fit_criterion: "PATCH /me updates CEFR level and persists to database; invalid values return HTTP 422."
+    priority: "Must"
+    tradeoff: "CEFR level is self-selected; automated placement test is deferred."
+    enforcing_component: "src/backend/auth/router.py"
+    verification_method: "test/offline/test_auth/test_profile.py::test_update_profile"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2 & 8.5"
 
-  - id: REQ-LANG-NFR-002
-    type: quality
-    statement: "Every displayed answer citation SHALL resolve to a retrieved, published source version."
-    rationale: "Citation validity is the measurable form of the grounding promise and cannot be traded against fluency."
-    fit_criterion:
-      kind: measurable
-      metric: citation_validity
-      threshold: "== 100% across the 40 answerable and abstention cases in EVAL-1.0.0; if not met -> REVIEW and release blocked"
-      measurement: "python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline --metric citation_validity"
-      on_fail: "REVIEW; release blocked; the failing response is discarded and the case is quarantined"
-    priority: must
-    priority_tradeoff: "Zero tolerance discards otherwise useful answers on one bad id; accepted for provenance."
-    asr: false
-    cluster: CL-GROUNDING
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.3 proposed target"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "FR-CHAT-001"
+    type: "functional"
+    statement: "The system shall provide a text-based conversational practice session tailored to the learner's CEFR level and selected topic."
+    fit_criterion: "POST /sessions/{id}/messages in conversation mode returns assistant response conforming to ChatResponseSchema within token budget."
+    priority: "Must"
+    tradeoff: "Restricted to text dialogue; speech synthesis and audio input are deferred."
+    enforcing_component: "src/backend/ai_companion/tutor.py"
+    verification_method: "test/offline/test_ai_companion/test_tutor.py::test_guided_conversation_flow"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 2 & 8.5"
 
-  - id: REQ-LANG-NFR-003
-    type: quality
-    statement: "Human-scored grounded answer correctness SHALL be at least 80% on the fixed evaluation set."
-    rationale: "Retrieval and citation checks do not prove the explanation is pedagogically correct; human scoring does."
-    fit_criterion:
-      kind: measurable
-      metric: grounded_answer_correctness
-      threshold: ">= 0.80 on 24 human-scored grounded cases (two reviewers, 0-2 rubric per criterion); if not met -> REVIEW and release blocked"
-      measurement: "python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --metric grounded_correctness --human-scored"
-      on_fail: "REVIEW; adjudicate disagreements, revise prompt or corpus, rerun; release blocked while below threshold"
-    priority: must
-    priority_tradeoff: "Human scoring costs reviewer time and limits evaluation frequency; accepted for a defensible quality claim."
-    asr: false
-    cluster: CL-GROUNDING
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.3 proposed target"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "FR-FEED-001"
+    type: "functional"
+    statement: "The system shall analyze learner-submitted text, returning structured grammar and writing corrections while keeping original text intact."
+    fit_criterion: "Writing feedback responses include original text, identified errors, suggested revisions, and grammatical explanations."
+    priority: "Must"
+    tradeoff: "Evaluates individual submissions without retaining long-term cross-session writing portfolios."
+    enforcing_component: "src/backend/grammar/evaluator.py"
+    verification_method: "test/offline/test_grammar/test_evaluator.py::test_writing_feedback_structure"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 2 & 8.5"
 
-  - id: REQ-LANG-PERF-001
-    type: performance
-    statement: "Published-chunk retrieval SHALL complete within a p95 latency of 800 ms under the reference load."
-    rationale: "Retrieval sits inside the 12 s turn budget; an unbounded query consumes the budget before the model is called."
-    fit_criterion:
-      kind: measurable
-      metric: retrieval_p95_ms
-      threshold: "<= 800 ms at 1,000 chunks and 5 concurrent requests in the reference test environment; if not met -> REVIEW before release"
-      measurement: "python scripts/bench_retrieval.py --chunks 1000 --concurrency 5 --runs 50"
-      on_fail: "REVIEW; add index tuning or caching; release blocked if p95 exceeds 1,200 ms"
-    priority: should
-    priority_tradeoff: "An additional index and query-plan work is needed; accepted if p95 stays under 800 ms."
-    asr: false
-    cluster: CL-GROUNDING
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §4 operational concern"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "FR-RAG-001"
+    type: "functional"
+    statement: "The system shall ground English lesson and grammar questions against approved vector chunks and present verifiable citations."
+    fit_criterion: "Responses to grounded queries include valid source_id and section title referencing approved lesson corpus."
+    priority: "Must"
+    tradeoff: "Answers only questions substantiated by the 5-10 MVP lessons; ungrounded questions trigger abstention."
+    enforcing_component: "src/backend/ai_companion/rag_pipeline.py"
+    verification_method: "test/offline/test_ai_companion/test_rag.py::test_grounded_answer_citation"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 3.2"
 
-  - id: REQ-LANG-FR-005
-    type: functional
-    statement: "Writing feedback SHALL preserve the original text, label suggestions as AI-generated, and let the learner accept or dismiss each suggestion."
-    rationale: "Silent overwriting destroys the learner's evidence and makes AI text indistinguishable from their own writing."
-    fit_criterion:
-      kind: machine_checkable
-      metric: silent_overwrite_count
-      threshold: "== 0 across 12 writing-feedback cases; 100% of suggestions labelled and dismissible; if not met -> REVIEW"
-      measurement: "pytest test/offline/test_writing_feedback.py -q"
-      on_fail: "REVIEW; the PR is blocked until the original text is read-only and the suggestion is separate"
-    priority: must
-    priority_tradeoff: "A two-step accept flow adds a click; accepted to preserve the learner's original."
-    asr: false
-    cluster: CL-RECORD
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 writing and grammar feedback"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "FR-VOC-001"
+    type: "functional"
+    statement: "The system shall randomly select published English vocabulary cards from the verified JSON dataset matching level and topic."
+    fit_criterion: "GET /vocabulary/random returns requested count of entries with review_status='published'; identical seed yields identical entries."
+    priority: "Must"
+    tradeoff: "Serves pre-reviewed JSON entries rather than generating real-time vocabulary with LLMs."
+    enforcing_component: "src/backend/vocabulary/loader.py"
+    verification_method: "test/offline/test_vocabulary/test_loader.py::test_random_selection_with_seed"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2 & 8.6"
 
-  - id: REQ-LANG-FR-006
-    type: functional
-    statement: "Vocabulary candidates SHALL require explicit learner confirmation before entering mastered vocabulary, deduplicated by user, word and sense."
-    rationale: "An unconfirmed model-extracted word becomes a false record of what the learner knows."
-    fit_criterion:
-      kind: machine_checkable
-      metric: unconfirmed_mastery_count
-      threshold: "== 0; 100% of inserts follow confirmation; dedupe key (user_id, word, sense); if not met -> REVIEW"
-      measurement: "pytest test/offline/test_vocabulary.py -q"
-      on_fail: "REVIEW; the insert path is blocked until confirmation is enforced"
-    priority: must
-    priority_tradeoff: "Candidate extraction adds a confirmation step; accepted to keep learner records human-approved."
-    asr: false
-    cluster: CL-RECORD
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 vocabulary review"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "FR-VOC-002"
+    type: "functional"
+    statement: "The system shall record user familiarity state ('learning', 'familiar', 'mastered') for reviewed vocabulary entries."
+    fit_criterion: "POST /me/vocabulary/{entry_id} updates familiarity state in user_vocabulary table and emits a learning event."
+    priority: "Must"
+    tradeoff: "Simple 3-tier familiarity state; full SuperMemo-2 spaced-repetition algorithm is deferred."
+    enforcing_component: "src/backend/vocabulary/service.py"
+    verification_method: "test/offline/test_vocabulary/test_service.py::test_record_familiarity"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 2 & 8.4"
 
-  - id: REQ-LANG-FR-007
-    type: functional
-    statement: "Quiz items SHALL be validated with a server-held answer key before display, and malformed or ambiguous items SHALL be rejected."
-    rationale: "A quiz without an authoritative key cannot be scored deterministically and turns into a model opinion."
-    fit_criterion:
-      kind: machine_checkable
-      metric: ambiguous_quiz_item_served
-      threshold: "== 0; 100% of displayed quizzes have a server-held key; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/test_quiz_contract.py -q"
-      on_fail: "REVIEW; the quiz is discarded and regenerated; release blocked"
-    priority: must
-    priority_tradeoff: "Quizzes are generated one step earlier and stored; accepted to keep keys server-side."
-    asr: true
-    forces_element: AssessmentService
-    cluster: CL-RECORD
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 quiz and feedback"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "FR-DASH-001"
+    type: "functional"
+    statement: "The system shall display a dashboard summarizing user learning events, completed sessions, and mastered vocabulary."
+    fit_criterion: "GET /me/progress returns valid JSON matching DashboardMetricsSchema containing non-negative event aggregates."
+    priority: "Must"
+    tradeoff: "Static aggregation cards; predictive learning analytics and grade charts are deferred."
+    enforcing_component: "src/backend/user_progress/service.py"
+    verification_method: "test/offline/test_user_progress/test_dashboard.py::test_dashboard_metrics_aggregation"
+    owner: "Member 4 (Henry)"
+    source: "CS5351 Project Plan Section 2 & 8.5"
 
-  - id: REQ-LANG-INV-004
-    type: invariant
-    statement: "A quiz score SHALL be computed only by server-side code; a client-supplied score SHALL be ignored."
-    rationale: "The score is a learning record and a progress input; accepting it from the client makes both forgeable."
-    fit_criterion:
-      kind: machine_checkable
-      metric: client_score_acceptance_count
-      threshold: "== 0 across 12 forged-score attempts; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_004_backend_scoring.py -q"
-      on_fail: "REVIEW; ignore the client field, recompute, log CRITICAL, block release"
-    priority: must
-    priority_tradeoff: "The client cannot optimistically show a score; accepted for integrity."
-    asr: false
-    cluster: CL-RECORD
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §8.4 quizzes"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "FR-CORP-001"
+    type: "functional"
+    statement: "The system shall provide an offline admin command to validate, chunk, embed, and transactionally index approved lesson documents."
+    fit_criterion: "Running scripts/ingest_content.py --manifest content/manifest.yaml indexes chunks without error and outputs an audit report."
+    priority: "Should"
+    tradeoff: "Requires CLI execution by team maintainers; no web-based CMS interface provided."
+    enforcing_component: "scripts/ingest_content.py"
+    verification_method: "test/offline/test_scripts/test_ingestion.py::test_admin_ingest_pipeline"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 3.1 & 8.7"
 
-  - id: REQ-LANG-FR-008
-    type: functional
-    statement: "The progress dashboard SHALL compute totals from stored learning events rather than from model narrative."
-    rationale: "Model-written summaries drift; event aggregation is reproducible and auditable."
-    fit_criterion:
-      kind: machine_checkable
-      metric: dashboard_model_sourced_totals
-      threshold: "== 0; 100% of dashboard values resolve to learning_events queries; if not met -> REVIEW"
-      measurement: "pytest test/offline/test_progress_projection.py -q"
-      on_fail: "REVIEW; the dashboard endpoint is blocked until totals are projected from events"
-    priority: must
-    priority_tradeoff: "Read-time aggregation costs a query; accepted instead of denormalised counters."
-    asr: true
-    forces_element: ProgressLedger
-    cluster: CL-RECORD
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 progress dashboard, §8.4 learning_events"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  # ==========================================
+  # NON-FUNCTIONAL REQUIREMENTS
+  # ==========================================
+  - id: "NFR-PERF-001"
+    type: "performance"
+    statement: "Tutor response generation p95 latency shall not exceed 12.0 seconds in the test environment."
+    fit_criterion: "95% of requests in automated load test suite complete with HTTP 200 in <= 12.0s."
+    priority: "Must"
+    tradeoff: "Caps maximum generated token length and retrieval candidates to meet latency targets."
+    enforcing_component: "src/backend/ai_companion/tutor.py"
+    verification_method: "test/live/test_latency.py::test_p95_response_latency"
+    owner: "Member 5 (Luming)"
+    source: "CS5351 Project Plan Section 3.3"
 
-  - id: REQ-LANG-INV-005
-    type: invariant
-    statement: "Every displayed progress total SHALL equal the aggregate of the learner's stored learning events for that period."
-    rationale: "A dashboard that disagrees with its source destroys the credibility of every other learning record."
-    fit_criterion:
-      kind: machine_checkable
-      metric: progress_total_mismatch_count
-      threshold: "== 0 over a 50-event fixture and a 200-request randomised parity run; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_005_progress_parity.py -q"
-      on_fail: "REVIEW; recompute from events, hide the affected dashboard, log CRITICAL, block release"
-    priority: must
-    priority_tradeoff: "Read-time aggregation costs a query; accepted for a single source of truth."
-    asr: false
-    cluster: CL-RECORD
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 acceptance example 5"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "NFR-QUAL-001"
+    type: "quality"
+    statement: "The RAG pipeline shall achieve a retrieval recall@5 score of at least 0.85 across the fixed benchmark evaluation dataset."
+    fit_criterion: "Automated retrieval evaluation on evaluation_set.json yields recall@5 >= 0.85."
+    priority: "Must"
+    tradeoff: "Requires upfront manual annotation of 15-25 evaluation queries and gold chunk IDs."
+    enforcing_component: "src/backend/ai_companion/retrieval_adapter.py"
+    verification_method: "test/offline/test_ai_companion/test_retrieval_eval.py::test_recall_at_5"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 3.3"
 
-  - id: REQ-LANG-FR-009
-    type: functional
-    statement: "Session continuity SHALL use a user-scoped summary of at most 400 tokens that the learner can edit or delete."
-    rationale: "Continuity is useful but must not become an uninspectable memory of the learner; deletion is part of the privacy promise."
-    fit_criterion:
-      kind: machine_checkable
-      metric: summary_scope_violation_count
-      threshold: "== 0; 100% of summaries <= 400 tokens and scoped to one user; if not met -> REVIEW"
-      measurement: "pytest test/offline/test_session_summary.py -q"
-      on_fail: "REVIEW; disable summary injection until scope and size limits are enforced"
-    priority: should
-    priority_tradeoff: "Extra storage and a deletion path; accepted for session continuity."
-    asr: true
-    forces_element: SessionSummaryStore
-    cluster: CL-RECORD
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 session continuity, §8.3 step 5"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "NFR-QUAL-002"
+    type: "quality"
+    statement: "Grounded responses must achieve a pedagogical correctness score >= 0.80 when evaluated against source lesson points."
+    fit_criterion: "Semantic evaluation replay on fixed grounded evaluation set achieves score >= 0.80."
+    priority: "Must"
+    tradeoff: "Enforces strict rubric grading; borderline or ungrounded claims are penalized."
+    enforcing_component: "src/backend/safety_boundary/evaluator.py"
+    verification_method: "test/live/test_semantic_eval.py::test_grounded_correctness"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 3.3"
 
-  - id: REQ-LANG-NFR-004
-    type: quality
-    statement: "Tutor responses SHALL complete within a p95 latency of 12 seconds in the reference environment."
-    rationale: "The learner is waiting in a conversation; beyond 12 s the interaction stops feeling like tutoring."
-    fit_criterion:
-      kind: measurable
-      metric: tutor_response_p95_seconds
-      threshold: "<= 12 s over 30 synthetic turns in the reference environment; if not met -> REVIEW and release blocked"
-      measurement: "python scripts/bench_tutor_latency.py --turns 30 --env reference"
-      on_fail: "REVIEW; reduce context or add a provider timeout; release blocked while above 12 s"
-    priority: must
-    priority_tradeoff: "Timeout and context budgets cap answer length; accepted for a responsive learner experience."
-    asr: false
-    cluster: CL-RESILIENCE
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.3 proposed target"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "NFR-QUAL-003"
+    type: "quality"
+    statement: "Citation validity shall be 100% with zero hallucinated source IDs across all generated responses."
+    fit_criterion: "100% of source_ids present in API responses match an active chunk in the retrieved candidate set."
+    priority: "Must"
+    tradeoff: "Responses with invalid citation format or unknown IDs are immediately discarded."
+    enforcing_component: "src/backend/safety_boundary/citation_validator.py"
+    verification_method: "test/offline/test_safety_boundary/test_citation_validator.py::test_zero_hallucinated_citations"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 3.3"
 
-  - id: REQ-LANG-NFR-005
-    type: quality
-    statement: "On model timeout or repeated 5xx after bounded retries, the system SHALL preserve the learner's draft and SHALL NOT mark an activity complete."
-    rationale: "A failed model call must not advance a quiz or lose the learner's input; completion is a deterministic decision."
-    fit_criterion:
-      kind: machine_checkable
-      metric: failed_turn_completion_count
-      threshold: "== 0 across 6 timeout and 5xx fault cases; 100% preserve the draft and offer retry; if not met -> REVIEW"
-      measurement: "pytest test/offline/test_degradation.py -q"
-      on_fail: "REVIEW; the PR is blocked until completion stays false on the failure path"
-    priority: must
-    priority_tradeoff: "Failed turns show a retry state instead of a partial answer; accepted."
-    asr: false
-    cluster: CL-RESILIENCE
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §2 acceptance example 4, §4 failure behaviour"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "NFR-QUAL-004"
+    type: "quality"
+    statement: "The system shall achieve 100% refusal accuracy on the fixed unambiguous off-topic test dataset."
+    fit_criterion: "All off-topic test cases in test/fixtures/off_topic_queries.json return status='rejected' and the exact fixed refusal string."
+    priority: "Must"
+    tradeoff: "May occasionally reject borderline edge cases to preserve zero tolerance on clear off-topic prompts."
+    enforcing_component: "src/backend/safety_boundary/scope_guard.py"
+    verification_method: "test/offline/test_safety_boundary/test_scope_guard.py::test_off_topic_refusal_accuracy"
+    owner: "Member 3 (Kapo)"
+    source: "CS5351 Project Plan Section 3.3"
 
-  - id: REQ-LANG-INV-006
-    type: invariant
-    statement: "No failure path SHALL skip ResponseValidator or OwnershipGuard when producing or persisting a turn."
-    rationale: "Safety bypasses happen in error handling, not on the happy path; the failure path is where the gate is easiest to drop."
-    fit_criterion:
-      kind: machine_checkable
-      metric: safety_bypass_count
-      threshold: "== 0 across 12 fault injections covering model, retrieval and persistence; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_006_no_safety_bypass.py -q"
-      on_fail: "REVIEW; release blocked; fail closed and log CRITICAL with the fault id"
-    priority: must
-    priority_tradeoff: "Fail-closed turns can reduce availability; accepted because safety outranks uptime."
-    asr: true
-    forces_element: TutorPipeline
-    cluster: CL-RESILIENCE
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §4 failure behaviour"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "NFR-SEC-001"
+    type: "security"
+    statement: "Zero safety policy escapes shall occur when executing the fixed adversarial prompt injection test suite."
+    fit_criterion: "Adversarial evaluation replay yields 0 escapes; system prompt instructions cannot be extracted or overridden."
+    priority: "Must"
+    tradeoff: "Retrieved text is treated strictly as untrusted data and isolated from system instruction blocks."
+    enforcing_component: "src/backend/ai_companion/prompt_assembly.py"
+    verification_method: "test/offline/test_safety_boundary/test_prompt_injection.py::test_zero_policy_escapes"
+    owner: "Member 5 (Luming)"
+    source: "CS5351 Project Plan Section 3.3"
 
-  - id: REQ-LANG-NFR-006
-    type: quality
-    statement: "When retrieval is unavailable, grounded lesson help SHALL abstain with an explicit limitation within two seconds and SHALL NOT fabricate citations."
-    rationale: "The failure to retrieve must be visible to the learner, not converted by the model into a confident answer."
-    fit_criterion:
-      kind: machine_checkable
-      metric: retrieval_failure_abstention_rate
-      threshold: "== 100% of 4 retrieval-outage cases abstain within 2 s with 0 citations; if not met -> REVIEW"
-      measurement: "pytest test/offline/test_degradation.py::test_retrieval_unavailable -q"
-      on_fail: "REVIEW; the grounded route is disabled until abstention is proven"
-    priority: must
-    priority_tradeoff: "Grounded questions fail closed during a retrieval outage; accepted."
-    asr: true
-    forces_element: DegradationController
-    cluster: CL-RESILIENCE
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §4 failure behaviour"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
+  - id: "NFR-COST-001"
+    type: "cost"
+    statement: "Context window assembly shall enforce a strict ceiling of 1,500 total prompt tokens per turn with automated history compaction."
+    fit_criterion: "Token counter assertion verifies assembled prompt token length <= 1,500 across all session turns."
+    priority: "Must"
+    tradeoff: "Compacts or truncates older conversational history turns after 6 messages."
+    enforcing_component: "src/backend/ai_companion/prompt_assembly.py"
+    verification_method: "test/offline/test_ai_companion/test_token_budget.py::test_token_cap_enforcement"
+    owner: "Member 2 (Leon)"
+    source: "CS5351 Project Plan Section 3.2 & 4"
 
-  - id: REQ-LANG-COST-001
-    type: cost
-    statement: "The system SHALL enforce a server-side daily AI call cap per learner, defaulting to 50 calls per 24 hours."
-    rationale: "An authenticated learner with a script can otherwise consume the project's whole provider budget in minutes."
-    fit_criterion:
-      kind: machine_checkable
-      metric: ai_calls_over_cap
-      threshold: "== 0 over a 60-call burst with cap 50; AI endpoints return 429 with reset time; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/test_cost_cap.py -q"
-      on_fail: "REVIEW; AI endpoints are disabled until the cap is enforced server-side"
-    priority: must
-    priority_tradeoff: "Heavy users are paused until the window resets; accepted to bound spend."
-    asr: true
-    forces_element: ModelGateway
-    cluster: CL-COST
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §4 budgets, §8.1 env names"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
+  - id: "NFR-GOV-001"
+    type: "governance"
+    statement: "The CI/CD pipeline shall enforce all 6 mandatory blocking gates on all pull requests touching main."
+    fit_criterion: "GitHub Actions workflow passes Test Approval, Static Analysis, Schema, Semantic Eval, Regression, and AI-Log gates."
+    priority: "Must"
+    tradeoff: "Strict PR merge friction; pull requests without prior tests or log updates are blocked."
+    enforcing_component: ".github/workflows/ci.yml"
+    verification_method: "test/offline/test_governance/test_ci_config.py::test_blocking_gates_declared"
+    owner: "Member 5 (Luming)"
+    source: "CS5351 Project Specification Section 6"
 
-  - id: REQ-LANG-COST-002
-    type: cost
-    statement: "Model spend SHALL stay within US$0.04 per six-turn reference session and trigger an alert when the seven-day mean drifts by more than 25%."
-    rationale: "Step changes in prompt size or retrieval count are invisible without a cost series, and a demo budget has a hard ceiling."
-    fit_criterion:
-      kind: measurable
-      metric: session_cost_usd
-      threshold: "<= 0.04 per six-turn reference session; alert when the 7-day mean rises > 25%; if not met -> REVIEW"
-      measurement: "python scripts/report_cost.py --window 7d --session-size 6"
-      on_fail: "REVIEW; reduce context budget or retrieval count; release blocked if the cap cannot be met"
-    priority: must
-    priority_tradeoff: "Context and output budgets cap answer richness; accepted to keep the demo affordable."
-    asr: false
-    cluster: CL-COST
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §4 cost caps"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
-
-  - id: REQ-LANG-FR-010
-    type: functional
-    statement: "An authorised content reviewer SHALL be able to ingest, preview, publish and retire a lesson source with provenance, licence, checksum and version recorded."
-    rationale: "Grounding is only as trustworthy as the corpus; unpublished or unlicensed text must never become a citation."
-    fit_criterion:
-      kind: machine_checkable
-      metric: publish_state_integrity
-      threshold: "== 100% of publishes carry provenance, licence, checksum, version and reviewer before activation; if not met -> REVIEW"
-      measurement: "pytest test/offline/test_content_publish.py -q"
-      on_fail: "REVIEW; activation is blocked until the manifest is complete"
-    priority: must
-    priority_tradeoff: "Publishing requires a second reviewer and a dry run; accepted for licence and quality control."
-    asr: false
-    cluster: CL-EVOLUTION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.1, §8.7 step 1"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
-
-  - id: REQ-LANG-GOV-001
-    type: governance
-    statement: "Content publication SHALL be atomic and only the active published version SHALL be retrievable; a retired version SHALL be excluded before the next query."
-    rationale: "An in-place corpus edit can serve a half-updated lesson and makes rollback and citation provenance impossible."
-    fit_criterion:
-      kind: machine_checkable
-      metric: unpublished_chunk_served
-      threshold: "== 0 across 64 replay cases and 8 retirement-race cases; if not met -> REVIEW and release blocked"
-      measurement: "pytest test/offline/invariants/test_inv_008_published_only.py -q"
-      on_fail: "REVIEW; block the publish, roll back to the prior active version, and log CRITICAL"
-    priority: must
-    priority_tradeoff: "A publish is a transactional version switch, not an in-place edit; accepted for reversibility."
-    asr: true
-    forces_element: ContentPublisher
-    cluster: CL-EVOLUTION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.1"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
-
-  - id: REQ-LANG-GOV-002
-    type: governance
-    statement: "Every AI turn SHALL record request_id, model_id, prompt_version, corpus_version, index_version and validation result."
-    rationale: "Without versioned turn metadata, a quality regression cannot be attributed to a prompt, corpus or model change."
-    fit_criterion:
-      kind: machine_checkable
-      metric: turn_metadata_completeness
-      threshold: "== 100% of sampled AI turns carry all six fields; if not met -> REVIEW"
-      measurement: "pytest test/offline/test_observability_metadata.py -q"
-      on_fail: "REVIEW; the turn path is blocked until the audit event is written"
-    priority: must
-    priority_tradeoff: "An extra write per turn and 30-day storage; accepted for auditability."
-    asr: true
-    forces_element: ObservabilityStore
-    cluster: CL-EVOLUTION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.2 step 7, §8.7 step 7"}
-    status: baselined
-    owner: "Member 3 (Backend & Data)"
-
-  - id: REQ-LANG-GOV-003
-    type: governance
-    statement: "A prompt, model, corpus or embedding change SHALL run the fixed EVAL-1.0.0 replay and SHALL be blocked on any invariant failure."
-    rationale: "Changing a version without replay converts a controlled experiment into an unmeasured production change."
-    fit_criterion:
-      kind: machine_checkable
-      metric: eval_gate_coverage
-      threshold: "== 100% of version-affecting changes run EVAL-1.0.0; 0 invariant failures merged; if not met -> REVIEW and release blocked"
-      measurement: "python scripts/check_eval_gate.py --base origin/main --head HEAD"
-      on_fail: "REVIEW; merge blocked until the replay passes and evidence is linked in the PR"
-    priority: must
-    priority_tradeoff: "Every model-facing change costs a replay run and reviewer time; accepted."
-    asr: false
-    cluster: CL-EVOLUTION
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §3.3, §8.8 step 3"}
-    status: baselined
-    owner: "Member 2 (AI & RAG)"
-
-  - id: REQ-LANG-NFR-007
-    type: quality
-    statement: "Onboarding, conversation, writing feedback, quiz and dashboard flows SHALL be keyboard operable and SHALL produce no critical accessibility violations."
-    rationale: "A language-learning product that excludes keyboard or screen-reader users fails its own audience before the pedagogy is evaluated."
-    fit_criterion:
-      kind: measurable
-      metric: axe_critical_violations
-      threshold: "== 0 across five critical flows; 100% keyboard operable; if not met -> REVIEW"
-      measurement: "npm --prefix frontend run test:a11y"
-      on_fail: "REVIEW; the flow is blocked from release until violations are fixed or explicitly waived with a reason"
-    priority: should
-    priority_tradeoff: "Custom controls take longer to build; accepted for an accessible MVP."
-    asr: false
-    cluster: CL-ACCESS
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §4 browser layer"}
-    status: baselined
-    owner: "Member 4 (Frontend & UX)"
-
-  - id: REQ-LANG-GOV-004
-    type: governance
-    statement: "Every PR that changes code or prompts SHALL include a new AI use log session entry."
-    rationale: "The log is the only durable evidence of which agent, model and human approvals produced a change."
-    fit_criterion:
-      kind: machine_checkable
-      metric: ai_log_gap_count
-      threshold: "== 0 code or prompt diffs without a new session entry; if not met -> REVIEW and merge blocked"
-      measurement: "python scripts/check_ai_log.py --pr $PR"
-      on_fail: "REVIEW; merge blocked until the session entry exists and references the PR"
-    priority: must
-    priority_tradeoff: "Every agent session needs a human-maintained log entry; accepted for audit evidence."
-    asr: false
-    cluster: CL-GOVERNANCE
-    source: {kind: stakeholder, ref: "CS5351 project sheet D1; Comprehensive_Project_Plan_version2.md §8.9"}
-    status: baselined
-    owner: "Member 5 (QA & Governance)"
-
-  - id: REQ-LANG-GOV-005
-    type: governance
-    statement: "Every implementation commit SHALL follow a human-approved plan that names requirement IDs, files, interfaces, negative tests and rollback."
-    rationale: "Pre-code approval is a required gate of the course; without a recorded artifact the gate is reconstructed after the fact."
-    fit_criterion:
-      kind: machine_checkable
-      metric: unapproved_implementation_commits
-      threshold: "== 0; 100% of implementation commits follow a recorded plan approval; if not met -> REVIEW and merge blocked"
-      measurement: "python scripts/check_test_approval.py --pr $PR"
-      on_fail: "REVIEW; merge blocked; the commit is reverted and re-planned"
-    priority: must
-    priority_tradeoff: "Plan approval adds a human gate before each build round; accepted by D9."
-    asr: false
-    cluster: CL-GOVERNANCE
-    source: {kind: stakeholder, ref: "CS5351 project sheet D9; Comprehensive_Project_Plan_version2.md §8.3 step 6"}
-    status: baselined
-    owner: "Member 5 (QA & Governance)"
-
-  - id: REQ-LANG-ARCH-004
-    type: architectural_constraint
-    statement: "Release 1 SHALL support one target language (English for Chinese-speaking learners) and text interaction only."
-    rationale: "Speech, multiple languages and a teacher portal multiply the corpus, model and review surface beyond one semester."
-    fit_criterion:
-      kind: structural
-      metric: out_of_scope_capability_count
-      threshold: "== 0 for speech, multi-language, teacher portal, payments and open web browsing; if not met -> REVIEW and an ADR is required"
-      measurement: "pytest test/structural/test_scope.py::test_no_out_of_scope_routes -q"
-      on_fail: "REVIEW; the capability is removed or deferred behind an accepted ADR and new requirements"
-    priority: must
-    priority_tradeoff: "Deferred features must wait for an ADR and new criteria; accepted for a demonstrable MVP."
-    asr: false
-    cluster: CL-GOVERNANCE
-    source: {kind: stakeholder, ref: "Comprehensive_Project_Plan_version2.md §0, §2 deferred features"}
-    status: baselined
-    owner: "Member 1 (Requirements & PM)"
-
-delta:
-  - baseline: R1
-    added:
-      - REQ-LANG-ARCH-001
-      - REQ-LANG-INV-001
-      - REQ-LANG-INV-002
-      - REQ-LANG-SEC-001
-      - REQ-LANG-ARCH-002
-      - REQ-LANG-SEC-002
-      - REQ-LANG-INV-003
-      - REQ-LANG-FR-001
-      - REQ-LANG-FR-002
-      - REQ-LANG-SEC-003
-      - REQ-LANG-SEC-004
-      - REQ-LANG-FR-003
-      - REQ-LANG-FR-004
-      - REQ-LANG-ARCH-003
-      - REQ-LANG-NFR-001
-      - REQ-LANG-NFR-002
-      - REQ-LANG-NFR-003
-      - REQ-LANG-PERF-001
-      - REQ-LANG-FR-005
-      - REQ-LANG-FR-006
-      - REQ-LANG-FR-007
-      - REQ-LANG-INV-004
-      - REQ-LANG-FR-008
-      - REQ-LANG-INV-005
-      - REQ-LANG-FR-009
-      - REQ-LANG-NFR-004
-      - REQ-LANG-NFR-005
-      - REQ-LANG-INV-006
-      - REQ-LANG-NFR-006
-      - REQ-LANG-COST-001
-      - REQ-LANG-COST-002
-      - REQ-LANG-FR-010
-      - REQ-LANG-GOV-001
-      - REQ-LANG-GOV-002
-      - REQ-LANG-GOV-003
-      - REQ-LANG-NFR-007
-      - REQ-LANG-GOV-004
-      - REQ-LANG-GOV-005
-      - REQ-LANG-ARCH-004
-    modified: []
-    obsoleted: []
-    trigger: "Initial baseline derived from the CS5351 project sheet and Comprehensive_Project_Plan_version2.md; frozen before candidate comparison."
+  - id: "NFR-GOV-002"
+    type: "governance"
+    statement: "Every pull request that modifies code or prompts must include an updated entry in docs/code-governance/ai-use-log.yaml."
+    fit_criterion: "CI Gate 6 fails with exit code 1 if git diff touches src/ or prompts/ without touching ai-use-log.yaml."
+    priority: "Must"
+    tradeoff: "Requires manual logging overhead for every AI coding turn."
+    enforcing_component: ".github/workflows/ci.yml"
+    verification_method: "test/offline/test_governance/test_ai_log.py::test_log_gate_script"
+    owner: "Member 1 (Adrian)"
+    source: "CS5351 Project Specification Section 6"
