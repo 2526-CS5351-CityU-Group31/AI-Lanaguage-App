@@ -173,3 +173,12 @@ sessions:
     files_touched:
       - "docs/code-governance/mcp-tool-manifest.md"
     human_interventions: "Human chose to rebuild to 13 runtime tools. Agent remapped callers to SSOT modules, added serve_vocabulary/guard_scope, removed persist_quiz_score/publish_content_version/persist_session_summary/emit_audit_event, and rewrote prohibited-calls table; verified 13 runtime + 10 agent rows, no legacy IDs/callers, all IDs resolve to SSOT."
+  - session_id: "SES-019"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B step 9: fix the stale architecture-blueprint path in AGENTS.md (human-applied, since AGENTS.md is a frozen human-only file)."
+    files_touched:
+      - "AGENTS.md"
+    human_interventions: "Agent identified that AGENTS.md reading-order step 3 pointed to a non-existent docs/architecture/architecture-blueprint.md; human applied the fix to reference architecture-blueprint.md at the repository root. Agent verified the path resolves and no stale references remain. This completes Tier B."

@@ -7,7 +7,7 @@ AI-Companion Language Learning Web Application featuring an LLM-powered conversa
 Before generating any plan or code, read the following artifacts in exact sequence:
 1. `.opencode/rules.md` & `.agent/rules.md`
 2. `docs/req/requirements.yaml`
-3. `docs/architecture/architecture-blueprint.md`
+3. `architecture-blueprint.md`
 4. `docs/architecture/invariants.md`
 5. `docs/architecture/permission-model.md`
 6. `docs/code-governance/structural-constraints.md`
