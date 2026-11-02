@@ -203,7 +203,7 @@ The stage sequence is Plan -> Build -> Verify -> Review -> Release. No stage may
 | `migrations/**` | read | write before first apply; frozen after | read | reviewer + rollback plan |
 | `prompts/**`, `content/**`, `.github/workflows/**`, `.opencode/**`, `.agent/**` | read | **no access** | read | yes |
 | `test/**` | read | write after test approval | read/write evidence | approval artifact |
-| `docs/ai-use-log.yaml` | read | append via tool only | read | session owner verifies |
+| `docs/code-governance/ai-use-log.yaml` | read | append via tool only | read | session owner verifies |
 | `transcripts/**`, `.env` | no access | no access | no access | humans only |
 
 ---
@@ -315,7 +315,7 @@ docs/
     runtime-policy-catalog.md
     configuration-governance.md
   code-governance/{structural-constraints.md, verification-constraints.md, mcp-tool-manifest.md}
-  ai-use-log.yaml
+  code-governance/{structural-constraints.md, verification-constraints.md, mcp-tool-manifest.md, ai-use-log.yaml, ai-use-log-schema.json}
   review-memo.md
   debt-register.md
   bug-diary.md

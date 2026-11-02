@@ -25,7 +25,7 @@
 | `docs/code-governance/structural-constraints.md` | read | read | read | yes | hook `guard_frozen` | declared |
 | `docs/code-governance/verification-constraints.md` | read | read | read | yes | hook `guard_frozen` | declared |
 | `docs/code-governance/mcp-tool-manifest.md` | read | read | read | yes | hook `guard_manifest` | declared |
-| `docs/ai-use-log.yaml` | read | append only via `append_ai_session` | read | session owner verifies | hook `guard_ai_log_append` | declared |
+| `docs/code-governance/ai-use-log.yaml` | read | append only via `append_ai_session` | read | session owner verifies | hook `guard_ai_log_append` | declared |
 | `docs/review-memo.md` | read | read | read | yes - reviewer only | hook `guard_review` | declared |
 | `docs/debt-register.md`, `docs/bug-diary.md` | read | append (new rows) | append (new rows) | yes for closing a row | hook `guard_append_only` | declared |
 | `docs/README.md` | read | guarded write | read | reviewer | hook `guard_docs` | declared |
@@ -100,7 +100,7 @@ Other invariant-enforcing modules are **guarded write**, not no-access: `TutorPi
 - **Who:** the release owner (Member 5 at baseline) or the on-call human, never an agent.
 - **When:** a production incident requires a hotfix to a protected path, or a rollback cannot wait for the normal ADR cycle.
 - **What:** a break-glass write is allowed only with a recorded incident id, a two-person approval and a rollback plan. The change is annotated in the commit message with `BREAK-GLASS: <incident>`.
-- **Record:** an entry in `docs/ai-use-log.yaml`, a `review-memo.md` memo and an `evaluation-logbook.md` row within 24 hours; an ADR within 5 working days.
+- **Record:** an entry in `docs/code-governance/ai-use-log.yaml`, a `review-memo.md` memo and an `evaluation-logbook.md` row within 24 hours; an ADR within 5 working days.
 - **Limit:** the emergency path may not disable an invariant test, remove a citation check or grant a model tool access. Those are not hotfixes; they are re-architecture.
 
 ## 6. Done-when status

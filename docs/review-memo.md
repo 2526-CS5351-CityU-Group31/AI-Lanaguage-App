@@ -93,7 +93,7 @@ One paragraph: why this verdict, which findings drove it, and what would change 
 2. **Evidence over assertion:** "tests pass" is not a review finding; the CI run id and the command are.
 3. **P0 citation:** a P0 must name the invariant or ADR it violates. If it cannot, downgrade it.
 4. **Frozen paths:** a change to `docs/req/requirements.yaml`, an accepted ADR, the blueprint, CI, prompts or permissions requires a human author and an ADR; the memo must record the approval id.
-5. **AI log:** a code or prompt PR without a new `docs/ai-use-log.yaml` session is a P0 for the process, not a P2.
+5. **AI log:** a code or prompt PR without a new `docs/code-governance/ai-use-log.yaml` session is a P0 for the process, not a P2.
 6. **Resolution:** every P0/P1 is either fixed in the PR or moved to `debt-register.md` with a `DBT-*` id before merge. An open P0 is never merged.
 7. **Retrospective:** if a defect escapes, the review memo is updated with the missed finding and a link to the bug diary entry.
 

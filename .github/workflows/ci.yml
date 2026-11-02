@@ -88,7 +88,7 @@ jobs:
           try:
               with open('docs/code-governance/ai-use-log-schema.json', 'r') as sf:
                   schema = json.load(sf)
-              with open('docs/ai-use-log.yaml', 'r') as lf:
+              with open('docs/code-governance/ai-use-log.yaml', 'r') as lf:
                   log_data = yaml.safe_load(lf)
               validate(instance=log_data, schema=schema)
               print("AI-use log schema is valid.")

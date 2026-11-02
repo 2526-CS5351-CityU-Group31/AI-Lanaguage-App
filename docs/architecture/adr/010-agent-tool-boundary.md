@@ -5,7 +5,7 @@
 - **Supersedes:** -
 - **Decision owner:** Member 5 (QA & Governance) with Member 1 (Requirements & PM)
 - **Related requirements:** REQ-LANG-GOV-004, REQ-LANG-GOV-005, REQ-LANG-ARCH-001, REQ-LANG-ARCH-002, REQ-LANG-SEC-002, REQ-LANG-SEC-003
-- **Related artifacts:** `docs/code-governance/mcp-tool-manifest.md`, `docs/architecture/permission-model.md`, `.opencode/permissions.jsonc`, `.opencode/rules.md`, `.agent/rules.md`, `AGENTS.md`, `Prompt.md`, `docs/ai-use-log.yaml`
+- **Related artifacts:** `docs/code-governance/mcp-tool-manifest.md`, `docs/architecture/permission-model.md`, `.opencode/permissions.jsonc`, `.opencode/rules.md`, `.agent/rules.md`, `AGENTS.md`, `Prompt.md`, `docs/code-governance/ai-use-log.yaml`
 - **Review triggers:** `unapproved_implementation_commits > 0`; `ai_log_gap_count > 0`; a manifest/table drift detected by `scripts/check_manifest.py`; a permission-hook denial bypassed; a new tool or role requested; an agent writes a protected path; a transcript is missing for a merged PR.
 
 ## Context
@@ -78,7 +78,7 @@ Every tool's rejection behaviour is typed (`SCHEMA_INVALID`, `CALLER_NOT_ALLOWED
 | `scripts/check_test_approval.py` | Verify approval artifact precedes implementation | `scripts/` (planned, `DBT-003`) |
 | `scripts/check_manifest.py` | Detect manifest/ADR/caller drift | `scripts/` (planned, `DBT-003`) |
 | Human reviewer | Approve plan, protected paths, content, release | PR review + `docs/review-memo.md` |
-| `docs/ai-use-log.yaml` | Record session, model, inputs, outputs, interventions | `append_ai_session` tool |
+| `docs/code-governance/ai-use-log.yaml` | Record session, model, inputs, outputs, interventions | `append_ai_session` tool |
 
 ## Quality attribute tradeoffs
 
