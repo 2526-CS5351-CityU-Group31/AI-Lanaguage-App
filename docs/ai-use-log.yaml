@@ -8,4 +8,4 @@ sessions:
     files_touched:
       - ".github/workflows/ci.yml"
       - "docs/code-governance/ai-use-log-schema.json"
-    human_intervention: "Manually created this entry point."
+    human_interventions: "Manually created this entry point."
