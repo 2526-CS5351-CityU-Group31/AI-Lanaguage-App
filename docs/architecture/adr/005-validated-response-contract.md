@@ -4,13 +4,13 @@
 - **Date:** 2026-10-27
 - **Supersedes:** -
 - **Decision owner:** Member 2 (AI & RAG) with Member 3 (Backend & Data)
-- **Related requirements:** REQ-LANG-ARCH-001, REQ-LANG-INV-001, REQ-LANG-INV-002, REQ-LANG-SEC-001, REQ-LANG-FR-003, REQ-LANG-FR-004, REQ-LANG-FR-007, REQ-LANG-NFR-002, REQ-LANG-NFR-006, REQ-LANG-GOV-002
-- **Related artifacts:** ADR-001, ADR-006, `docs/architecture/invariants.md` INV-001/002/007, `runtime-policy-catalog.md` RP-001/RP-003/RP-004, `structural-constraints.md` S4, `mcp-tool-manifest.md`
-- **Review triggers:** `citation_reject_total > 0`; `schema_reject_total / turns > 5%` in a rolling week; repair-attempt success `< 50%`; `tutor_response_p95_seconds > 12` for 3 days; the provider changes or removes structured-output mode; a new task type is proposed without a contract; any change to `ResponseValidator` rules.
+- **Related requirements:** INV-SCOPE-001, INV-SCOPE-002, INV-CITE-001, NFR-SEC-001, NFR-QUAL-003, FR-CHAT-001, FR-RAG-001, FR-FEED-001, NFR-COST-001, NFR-GOV-002
+- **Related artifacts:** ADR-001, ADR-006, `docs/architecture/invariants.md` INV-SCOPE-001/002, INV-CITE-001, NFR-SEC-001, `runtime-policy-catalog.md` RP-001/RP-003/RP-004, `structural-constraints.md` S4, `mcp-tool-manifest.md`
+- **Review triggers:** `citation_reject_total > 0`; `schema_reject_total / turns > 5%` in a rolling week; repair-attempt success `< 50%`; `tutor_response_p95_seconds > 12` for 3 days; the provider changes or removes structured-output mode; a new task type is proposed without a contract; any change to `CitationValidator` rules.
 
 ## Context
 
-The tutor produces four kinds of output: a conversational reply, a grounded lesson answer with citations, writing feedback, and a quiz draft. Each has a different structure and a different failure cost.
+The tutor produces three kinds of output: a conversational reply, a grounded lesson answer with citations, and writing feedback. Each has a different structure and a different failure cost.
 
 A free-form response is the easiest to generate and the hardest to govern. It gives the validator nothing to check except length; a plausible sentence with an invented citation is indistinguishable from a grounded one. The lecture's warning applies directly: a rule that cannot be checked is a rule the agent will invent a behaviour for.
 
@@ -23,7 +23,7 @@ The forces:
 
 ## Decision
 
-Require every model call to return a task-specific JSON object, and accept it only through `ResponseValidator.validate(output, evidence) -> Verdict`, a pure function that checks schema, provenance, length, markup and abstention consistency before display or persistence.
+Require every model call to return a task-specific JSON object, and accept it only through `CitationValidator.validate(output, evidence) -> Verdict`, a pure function that checks schema, provenance, length, markup and abstention consistency before display or persistence.
 
 A failed validation gets **one** repair attempt with the same evidence set and temperature 0 only when the failure is repairable (`schema_invalid`, `unsafe_markup`, `over_length`). Citation, authority and tool-request failures are not repairable in the same turn: they discard the output and return a safe fallback.
 
@@ -41,7 +41,7 @@ A failed validation gets **one** repair attempt with the same evidence set and t
 
 | Field | Type | Required | Validation |
 |---|---|---|---|
-| `task` | enum `conversation` `lesson_help` `writing_feedback` `quiz_draft` | yes | must equal the requested task |
+| `task` | enum `conversation` `lesson_help` `writing_feedback` | yes | must equal the requested task |
 | `abstained` | boolean | yes | if true, `source_ids` must be empty and `answer` must contain the limitation phrase |
 | `source_ids` | array of strings, max 5 | yes | every id must be in `evidence.published_ids`; no duplicates |
 | `answer` | string, max 1,200 chars | yes | markdown allowlist (bold, italics, lists, inline code); no raw HTML |
@@ -56,7 +56,6 @@ A failed validation gets **one** repair attempt with the same evidence set and t
 | `conversation` | none | `source_ids` may be empty; no citation is displayed |
 | `lesson_help` | none | at least one `source_id` unless `abstained` is true |
 | `writing_feedback` | `suggested_text` (max 1,500), `explanation` (max 800), `examples` (max 2 x 300) | `suggested_text` never replaces the stored original; it is a proposal |
-| `quiz_draft` | `items` (3-5), each with `question` (max 300), `options` (3-4 x 120), `correct_index`, `explanation` (max 500), `source_ids` | the key is stripped before the client sees the item; malformed item rejects the whole quiz |
 
 ### Rejection codes
 
@@ -69,17 +68,15 @@ A failed validation gets **one** repair attempt with the same evidence set and t
 | `citation_unpublished` | source id exists but is retired/unpublished | no | discard; abstain; security event |
 | `abstention_inconsistent` | `abstained=true` with citations, or limitation missing | no | discard; safe fallback |
 | `tool_request` | any tool/function/role field present | no | discard; security event |
-| `quiz_key_invalid` | missing/ambiguous key or duplicate options | no | discard; regenerate next turn |
 
 ## Responsibility map
 
 | Element | Responsibility | Implemented in |
 |---|---|---|
-| `TutorPipeline` | Request the task contract, pass evidence, stop on a failed verdict | `src/tutor_pipeline.py` |
-| `ModelGateway` | Enforce structured output, timeout, one repair call, token cap | `src/model_gateway.py` |
-| `ResponseValidator` | Pure schema, provenance, length, markup and abstention checks | `src/response_validator.py` |
-| `DegradationController` | Map a non-repairable failure to `SAFE_FALLBACK` or abstention | `src/degradation_controller.py` |
-| `ObservabilityStore` | Record rejection code, repair count and validation id | `src/observability_store.py` |
+| `RagPipeline` | Request the task contract, pass evidence, stop on a failed verdict, and map a non-repairable failure to a safe fallback or abstention | `src/backend/ai_companion/rag_pipeline.py` |
+| `Tutor` | Enforce structured output, timeout, one repair call, token cap | `src/backend/ai_companion/tutor.py` |
+| `CitationValidator` | Pure schema, provenance, length, markup and abstention checks | `src/backend/safety_boundary/citation_validator.py` |
+| `PromptAssembler` | Assemble the task schema within the token budget | `src/backend/ai_companion/prompt_assembly.py` |
 
 ## Quality attribute tradeoffs
 
@@ -89,18 +86,18 @@ A failed validation gets **one** repair attempt with the same evidence set and t
 | Grounding | Citation IDs checked against retrieved published set | No fabricated authority | Answers without a retrieved source must abstain | `citation_validity < 100%` |
 | Resilience | One repair attempt, then fallback | Formatting noise is absorbed | A second failure costs one extra call | `validation_reject_rate > 5%` |
 | Latency | Repair only for repairable errors; 25 s provider timeout | Bounded turn time | Some turns end in a retry message | `p95 > 12 s` |
-| Cost | One repair max; output token cap 700 | Predictable spend | Shorter explanations | `session_cost_usd > 0.04` |
+| Cost | One repair max; output token cap within the 1,500 prompt-token budget | Predictable spend | Shorter explanations | `prompt_tokens_per_turn > 1,500` |
 | Maintainability | One contract per task, versioned with the prompt | Changes are reviewable | Adding a task requires a schema and tests | schema version bump without migration |
 
 ## Alternatives considered
 
 | Option | Failed criterion | Evidence |
 |---|---|---|
-| Free-form prose with post-hoc regex and keyword checks | Invariant protection: a regex cannot prove that a quoted lesson exists in the retrieved set | `evaluation-table.md` C1 explanation-isolation rule; `INV-002` |
-| Model self-critique ("check your own citations") | Authority separation: the same model is not an independent gate, and a self-check can rationalise an invented source | `INV-001`; no authoritative verifier in the path |
-| Client-side JSON schema validation | Isolation/authority: the client is untrusted and can be bypassed; it also cannot know the retrieved set | `REQ-LANG-ARCH-001`, `REQ-LANG-SEC-002` |
-| Provider JSON mode without server checks | Grounding: schema-valid output can still contain an unpublished or invented `source_id` | `INV-002`; RP-004 |
-| Two-model critic in R1 | Cost and latency: doubles model spend and adds a second non-deterministic judge without a deterministic gate | `COST-002`, `NFR-004`; deferred to round 2 only with an ADR |
+| Free-form prose with post-hoc regex and keyword checks | Invariant protection: a regex cannot prove that a quoted lesson exists in the retrieved set | `evaluation-table.md` C1 explanation-isolation rule; `INV-CITE-001` |
+| Model self-critique ("check your own citations") | Authority separation: the same model is not an independent gate, and a self-check can rationalise an invented source | `INV-SCOPE-001`; no authoritative verifier in the path |
+| Client-side JSON schema validation | Isolation/authority: the client is untrusted and can be bypassed; it also cannot know the retrieved set | `INV-SCOPE-001`, `INV-SEC-002` |
+| Provider JSON mode without server checks | Grounding: schema-valid output can still contain an unpublished or invented `source_id` | `INV-CITE-001`; RP-004 |
+| Two-model critic in R1 | Cost and latency: doubles model spend and adds a second non-deterministic judge without a deterministic gate | `NFR-COST-001`, `NFR-PERF-001`; deferred to round 2 only with an ADR |
 
 ## Consequences
 
@@ -116,7 +113,6 @@ A failed validation gets **one** repair attempt with the same evidence set and t
 - More prompt engineering: the schema occupies ~300 tokens on every call.
 - More rejection paths to test; `schema_reject_total` becomes an operational metric.
 - Legitimate answers can be lost to a strict length or markup cap; the repair attempt absorbs most, not all.
-- The quiz draft schema complicates prompt design; a malformed item rejects the whole quiz.
 
 ## Review triggers
 
@@ -133,4 +129,4 @@ A failed validation gets **one** repair attempt with the same evidence set and t
 
 | Date | Change | Evidence |
 |---|---|---|
-| 2026-10-27 | Initial contract accepted at baseline R1 | `evaluation-logbook.md` 2026-10-27; `trace-matrix.md` rows for REQ-LANG-ARCH-001 and REQ-LANG-INV-002 |
+| 2026-10-27 | Initial contract accepted at baseline R1 | `evaluation-logbook.md` 2026-10-27; `trace-matrix.md` rows for INV-SCOPE-001 and INV-CITE-001 |

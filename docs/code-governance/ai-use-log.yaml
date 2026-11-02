@@ -70,3 +70,12 @@ sessions:
     files_touched:
       - "docs/architecture/adr/001-guarded-monolith.md"
     human_interventions: "Human chose the 'full remap incl. prose names' option for ADR-001. Agent remapped Related requirements, responsibility map (19 flat -> 18 nested), layered-context table (replaced with pointer to ADR-006 at 1,500 tokens), and legacy module names in prose; verified all referenced IDs resolve to SSOT and no legacy names remain."
+  - session_id: "SES-008"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B step 5b: remap ADR-005 to SSOT IDs and modules, and remove the uncovered quiz_draft task/enum/rejection code and cost metrics."
+    files_touched:
+      - "docs/architecture/adr/005-validated-response-contract.md"
+    human_interventions: "Human approved the proposed ADR-005 edit set (including removing quiz_draft per Q4). Agent remapped IDs, module names, alternatives evidence, and change log; removed quiz_draft from the task enum, task table, and rejection codes; verified no legacy IDs/quiz refs remain and all referenced IDs resolve to SSOT."
