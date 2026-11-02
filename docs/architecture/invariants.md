@@ -1,164 +1,174 @@
-# Invariant register - baseline R1 (round 1)
+# Invariant register - baseline R1
 
-**Status:** declared at baseline, 2026-10-27. No invariant is `enforced` or `verified` until its failing test exists and passes on the fixed build. The gap is tracked once as `DBT-003` and is not hidden per row.
+**Status:** declared at baseline. No invariant is `enforced` or `verified` until its failing test exists and passes on the fixed build. The gap is tracked once as `DBT-003` and is not hidden per row.
 
 **Rule:** an invariant is a property that must hold on every execution path, including failure paths. If a row here restates a requirement without naming an enforcer, it is a slogan and must be removed or rewritten.
 
-**Source of truth:** the statement and fit criterion are owned by `docs/req/requirements.yaml`; this file owns enforcement, verification and fallback.
+**Source of truth:** the statement and fit criterion are owned by `docs/req/requirements.yaml`; this file owns enforcement, verification and fallback. This register contains exactly the 13 invariant requirements declared in that registry; any row here without a matching SSOT requirement is not valid.
 
 ## Summary
 
-| ID | Statement (one line) | Enforced by | Verified by | Round |
+| ID | Statement (one line) | Enforced by | Verified by | Owner |
 |---|---|---|---|---|
-| INV-001 | No unvalidated model output is displayed or persisted | `ResponseValidator.validate_output()` | `test_inv_001_no_unvalidated_output.py` | 1 |
-| INV-002 | No citation outside the retrieved published set is displayed | `ResponseValidator.validate_citations()` | `test_inv_002_citation_provenance.py` | 1 |
-| INV-003 | No learner reads or writes another learner's record | `OwnershipGuard.authorize()` | `test_inv_003_cross_user_isolation.py` | 1 |
-| INV-004 | No client-supplied quiz score is accepted | `AssessmentService.score_attempt()` | `test_inv_004_backend_scoring.py` | 1 |
-| INV-005 | Every displayed total equals the stored event aggregate | `ProgressLedger.project_progress()` | `test_inv_005_progress_parity.py` | 1 |
-| INV-006 | No failure path skips validation or authorization | `TutorPipeline.handle_turn()` | `test_inv_006_no_safety_bypass.py` | 1 |
-| INV-007 | Retrieved text cannot change policy, tools or authorization | `PromptAssembler.assemble()` | `test_inv_007_retrieved_text_is_data.py` | 1 |
-| INV-008 | Only active published content is served | `RetrievalService.search()` | `test_inv_008_published_only.py` | 1 |
-| INV-009 | Learner writing never enters the shared corpus | `ContentPublisher.ingest()` | `test_inv_009_privacy_boundary.py` | 1 |
-| INV-010 | Audit records never contain raw learner text | `ObservabilityStore.append_turn_event()` | `test_inv_010_redaction.py` | 1 |
-| INV-011 | Memory cannot influence scores, progress or authorization | `SessionSummaryStore.get()` | `test_inv_011_summary_isolation.py` | 1 |
+| INV-SCOPE-001 | Every user message passes scope control before retrieval/LLM | `src/backend/safety_boundary/scope_guard.py` | `test/offline/test_safety_boundary/test_scope_guard.py::test_scope_pipeline_execution_order` | Member 3 (Kapo) |
+| INV-SCOPE-002 | Off-topic request gets exact fixed refusal, zero model tokens | `src/backend/safety_boundary/scope_guard.py` | `test/offline/test_safety_boundary/test_scope_guard.py::test_fixed_refusal_response` | Member 3 (Kapo) |
+| INV-SCOPE-003 | Rejected request makes zero RAG/LLM calls | `src/backend/api/routers/chat.py` | `test/offline/test_safety_boundary/test_scope_guard.py::test_zero_calls_on_rejection` | Member 3 (Kapo) |
+| INV-SCOPE-004 | Uncertain intent gets fixed clarification, no LLM | `src/backend/safety_boundary/scope_guard.py` | `test/offline/test_safety_boundary/test_scope_guard.py::test_uncertain_intent_clarification` | Member 3 (Kapo) |
+| INV-SCOPE-005 | Mixed intent blocked, zero retrieval/LLM | `src/backend/safety_boundary/scope_guard.py` | `test/offline/test_safety_boundary/test_scope_guard.py::test_mixed_intent_blocking` | Member 3 (Kapo) |
+| INV-SCOPE-006 | Retrieval only when `requires_grounding` is true | `src/backend/ai_companion/retrieval_adapter.py` | `test/offline/test_ai_companion/test_retrieval_conditions.py::test_conditional_retrieval_routing` | Member 2 (Leon) |
+| INV-AUTH-001 | No cross-user access; all queries scoped to authenticated user | `src/backend/auth/security.py` | `test/offline/test_auth/test_authorization.py::test_cross_user_isolation` | Member 3 (Kapo) |
+| INV-LANG-001 | Only English; `language != 'en'` rejected | `src/backend/api/schemas/profile.py` | `test/offline/test_auth/test_profile.py::test_reject_non_english` | Member 3 (Kapo) |
+| INV-CEFR-001 | Only A1/A2/B1/B2 accepted at API boundary | `src/backend/api/schemas/profile.py` | `test/offline/test_auth/test_profile.py::test_reject_invalid_cefr` | Member 3 (Kapo) |
+| INV-SEC-001 | Runtime vector DB credentials are read-only | `src/backend/database/vector_client.py` | `test/offline/test_database/test_vector_permissions.py::test_runtime_vector_read_only` | Member 5 (Luming) |
+| INV-SEC-002 | Zero file-upload endpoints exposed | `src/backend/main.py` | `test/offline/test_api/test_routes.py::test_no_upload_endpoints_exposed` | Member 5 (Luming) |
+| INV-PROG-001 | Dashboard metrics from DB events, never LLM | `src/backend/user_progress/service.py` | `test/offline/test_user_progress/test_dashboard.py::test_progress_derived_from_events` | Member 3 (Kapo) |
+| INV-CITE-001 | Citations must match retrieved published chunk IDs, else abstain | `src/backend/safety_boundary/citation_validator.py` | `test/offline/test_safety_boundary/test_citation_validator.py::test_reject_invalid_citations` | Member 2 (Leon) |
 
 ---
 
-## INV-001 - No unvalidated model output
+## INV-SCOPE-001 - Scope pipeline precedes retrieval and model
 
-- **statement:** No model-generated text SHALL be displayed to a learner or persisted as a learning record unless it carries a successful `ResponseValidator` verdict.
-- **source:** `REQ-LANG-INV-001`
-- **enforced_by:** `ResponseValidator.validate_output()` (the single authoritative gate; imported only by `TutorPipeline`)
-- **verification:** negative test injects a bypass path that returns model text without a verdict; the test asserts the response is not rendered and the record count is unchanged. Boundary suite includes malformed schema, oversized output and a valid control. `test/offline/invariants/test_inv_001_no_unvalidated_output.py::test_no_unvalidated_output` fails on the broken build (V2).
-- **fallback:** discard the output, return `SAFE_FALLBACK` with a retry message, append a CRITICAL audit event, and leave the learner record unchanged.
+- **statement:** Every user message must pass through the bounded scope-control pipeline before retrieval or tutor-model invocation.
+- **fit_criterion:** 100% of incoming chat requests log an upstream `ScopeResult` prior to any vector store or LLM client call.
+- **enforced_by:** `scope_guard.py` runs first in the chat router; no retrieval/LLM client is reachable until a `ScopeResult` is produced.
+- **verification:** ordering test asserts a `ScopeResult` is recorded before any mocked vector/LLM call. `test/offline/test_safety_boundary/test_scope_guard.py::test_scope_pipeline_execution_order`
+- **fallback:** reject the turn before any downstream call; return a fixed clarification/refusal; log a CRITICAL audit event.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-005 §Decision, §Rejection codes; ADR-001 §Decision
+- **source:** `INV-SCOPE-001` in `docs/req/requirements.yaml`
 
-## INV-002 - Citation provenance
+## INV-SCOPE-002 - Fixed refusal for off-topic requests
 
-- **statement:** The system SHALL NOT display a citation whose `source_id` is absent from the published chunks retrieved for that turn.
-- **source:** `REQ-LANG-INV-002`
-- **enforced_by:** `ResponseValidator.validate_citations()` (subset check against `EvidenceSet.published_ids`)
-- **verification:** tests for unknown id, retired id, id from another level, and a valid id; each negative case must produce no citation and an abstention. `test/offline/invariants/test_inv_002_citation_provenance.py`
-- **fallback:** discard the entire answer, return an abstention with the limitation phrase, log `validation_result=rejected_citation` at CRITICAL with the offending id.
+- **statement:** A user request determined to be unrelated to language learning must receive the approved deterministic fixed refusal string.
+- **fit_criterion:** Returns exact string `"I'm sorry, but I can only help with language-learning questions."` with HTTP 200 and zero model-generated tokens.
+- **enforced_by:** `scope_guard.py` returns the constant refusal before model invocation.
+- **verification:** `test/offline/test_safety_boundary/test_scope_guard.py::test_fixed_refusal_response`
+- **fallback:** return the fixed refusal string; no model call; no state mutation.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-005 §Response contracts; ADR-007 §Decision
+- **source:** `INV-SCOPE-002` in `docs/req/requirements.yaml`
 
-## INV-003 - Cross-user isolation
+## INV-SCOPE-003 - Zero calls on rejection
 
-- **statement:** A learner SHALL NOT read, update or delete another learner's record by any request path.
-- **source:** `REQ-LANG-SEC-002`
-- **enforced_by:** `OwnershipGuard.authorize()` (called by every repository-backed service; no direct table access from the gateway)
-- **verification:** 20 probes across sessions, messages, writing, vocabulary, quizzes and dashboard; each returns 404 with no body and writes no mutation. `test/offline/invariants/test_inv_003_cross_user_isolation.py`
-- **fallback:** return 404 with an empty body, append a SECURITY event with the resource type (not content), and alert the operator after 5 denials in 10 minutes.
+- **statement:** A deterministically rejected request must make exactly zero RAG vector searches and zero tutor LLM calls.
+- **fit_criterion:** Vector search mock call count == 0 and LLM API client call count == 0 for all rejected test cases.
+- **enforced_by:** `chat.py` router checks the scope verdict and short-circuits before retrieval/LLM.
+- **verification:** `test/offline/test_safety_boundary/test_scope_guard.py::test_zero_calls_on_rejection`
+- **fallback:** return the scope refusal/clarification; assert zero downstream calls; log a CRITICAL audit event.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-001 §Boundaries; ADR-010 §Roles
+- **source:** `INV-SCOPE-003` in `docs/req/requirements.yaml`
 
-## INV-004 - Backend-only scoring
+## INV-SCOPE-004 - Uncertain intent clarification
 
-- **statement:** A quiz score SHALL be computed only by server-side code; a client-supplied score SHALL be ignored and never stored.
-- **source:** `REQ-LANG-INV-004`
-- **enforced_by:** `AssessmentService.score_attempt()` (loads the stored key; ignores `score` in the request model)
-- **verification:** 12 forged-score attempts, including a valid answer with a wrong claimed score; stored score equals the deterministic result in every case. `test/offline/invariants/test_inv_004_backend_scoring.py`
-- **fallback:** ignore the field, recompute from the key, append a CRITICAL audit event with `request_id`, and return the true score.
+- **statement:** An uncertain intent request must return the approved fixed clarification response and must not bypass scope control.
+- **fit_criterion:** Ambiguous user inputs deterministically yield `status='uncertain'`, zero external LLM calls, and a static clarification prompt.
+- **enforced_by:** `scope_guard.py` classifies ambiguous input as `uncertain` and returns the fixed clarification.
+- **verification:** `test/offline/test_safety_boundary/test_scope_guard.py::test_uncertain_intent_clarification`
+- **fallback:** return the static clarification prompt; no model call.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-008 §Scoring rules; ADR-005 §Rejection codes
+- **source:** `INV-SCOPE-004` in `docs/req/requirements.yaml`
 
-## INV-005 - Event-sourced totals
+## INV-SCOPE-005 - Mixed-intent blocking
 
-- **statement:** Every displayed progress total SHALL equal the aggregate of the learner's stored learning events for that period.
-- **source:** `REQ-LANG-INV-005`
-- **enforced_by:** `ProgressLedger.project_progress()` (reads events; an optional cache is parity-checked in the same request)
-- **verification:** a 50-event fixture plus a 200-request randomised parity run; the displayed total and the direct event aggregate are compared; any mismatch fails. `test/offline/invariants/test_inv_005_progress_parity.py`
-- **fallback:** recompute directly from events; if parity still fails, return 503 for the dashboard with a retry message, hide the numeric cards, and append a CRITICAL event.
+- **statement:** A mixed-intent request must not silently execute an unsupported part and must return a fixed resubmission clarification.
+- **fit_criterion:** Inputs containing partial off-topic actions yield `status='mixed'` and zero retrieval or tutor calls.
+- **enforced_by:** `scope_guard.py` classifies as `mixed` and blocks all downstream execution.
+- **verification:** `test/offline/test_safety_boundary/test_scope_guard.py::test_mixed_intent_blocking`
+- **fallback:** return the fixed resubmission clarification; no model call; no state mutation.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-008 §Event model; ADR-001 §Authority
+- **source:** `INV-SCOPE-005` in `docs/req/requirements.yaml`
 
-## INV-006 - No safety bypass
+## INV-SCOPE-006 - Conditional retrieval only
 
-- **statement:** No failure path SHALL skip `ResponseValidator` or `OwnershipGuard` when producing or persisting a turn.
-- **source:** `REQ-LANG-INV-006`
-- **enforced_by:** `TutorPipeline.handle_turn()` (fail-closed orchestration; the degradation route never returns raw model text)
-- **verification:** 12 fault injections across model timeout, malformed output, retrieval outage, database timeout and summary failure; each asserts zero calls to persistence with unvalidated text and zero display. `test/offline/invariants/test_inv_006_no_safety_bypass.py`
-- **fallback:** fail closed: no display, no persistence, `SAFE_FALLBACK` message, CRITICAL audit event, increment `safety_bypass_total` (must stay 0).
+- **statement:** Retrieval from the vector database must be conditional and executed only when `requires_grounding` is true.
+- **fit_criterion:** Zero vector search calls for ungrounded conversation, writing feedback, vocabulary JSON lookup, or rejected states.
+- **enforced_by:** `retrieval_adapter.py` gates retrieval on the `requires_grounding` flag.
+- **verification:** `test/offline/test_ai_companion/test_retrieval_conditions.py::test_conditional_retrieval_routing`
+- **fallback:** skip retrieval; answer without citations; record the routing decision.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-001 §Decision; ADR-005 §Decision
+- **source:** `INV-SCOPE-006` in `docs/req/requirements.yaml`
 
-## INV-007 - Retrieved text is data
+## INV-AUTH-001 - Cross-user isolation
 
-- **statement:** Retrieved passages SHALL be treated as untrusted data and SHALL NOT alter system policy, tool privileges, or authorization.
-- **source:** `REQ-LANG-SEC-001`
-- **enforced_by:** `PromptAssembler.assemble()` (delimited untrusted block; restated constraints after evidence; no tool schema in the prompt)
-- **verification:** 24 adversarial cases across injection, role-play, tool-request and data-exfiltration families; zero policy escapes and zero privilege changes. `test/offline/invariants/test_inv_007_retrieved_text_is_data.py`
-- **fallback:** quarantine the flagged chunk, remove it from evidence, re-retrieve once; if no safe evidence remains, abstain. Append a SECURITY event; never execute a tool request from content.
+- **statement:** Cross-user data access is strictly forbidden; all session, progress, and vocabulary queries must be scoped to the authenticated user ID.
+- **fit_criterion:** Access attempts using another user's session ID or user ID yield HTTP 403/404 with 0 record disclosures and 0 state mutations.
+- **enforced_by:** `auth/security.py` scopes every record query to the authenticated user ID.
+- **verification:** `test/offline/test_auth/test_authorization.py::test_cross_user_isolation`
+- **fallback:** return 404 with an empty body; append a SECURITY event with resource type only; no mutation.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-005 §Decision; ADR-006 §Assembly pipeline
+- **source:** `INV-AUTH-001` in `docs/req/requirements.yaml`
 
-## INV-008 - Published-only serving
+## INV-LANG-001 - English only
 
-- **statement:** Only chunks belonging to the active published version of a source SHALL be served to retrieval, and a retired version SHALL be excluded before the next query.
-- **source:** `REQ-LANG-GOV-001`
-- **enforced_by:** `RetrievalService.search()` (joins active versions and filters published/language/level/topic before ranking)
-- **verification:** 64 replay cases plus 8 retirement-race cases; zero unpublished or retired chunks in any evidence set; a chunk retired mid-turn is rejected by the validator. `test/offline/invariants/test_inv_008_published_only.py`
-- **fallback:** exclude the chunk, re-retrieve once; if no active evidence remains, abstain; append a CRITICAL event with the version id.
+- **statement:** The application supports only the English language; all registration and profile requests with `language != 'en'` must be rejected.
+- **fit_criterion:** Payloads with `language != 'en'` fail with HTTP 422 Unprocessable Entity.
+- **enforced_by:** `api/schemas/profile.py` validates the language field.
+- **verification:** `test/offline/test_auth/test_profile.py::test_reject_non_english`
+- **fallback:** return 422 with a field error; no persistence.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-007 §Publication model; ADR-007 §Ingestion and activation flow
+- **source:** `INV-LANG-001` in `docs/req/requirements.yaml`
 
-## INV-009 - Learner writing stays out of the corpus
+## INV-CEFR-001 - Canonical CEFR levels only
 
-- **statement:** Raw learner writing SHALL NOT enter the shared curriculum corpus, the vector index, or a content version.
-- **source:** `REQ-LANG-SEC-004`
-- **enforced_by:** `ContentPublisher.ingest()` (accepts only manifest-declared licensed sources; rejects files under learner paths; no writer from learner tables)
-- **verification:** a test attempts to ingest a writing submission path and a chunk containing a learner email; both are rejected; a scan of the manifest and index metadata finds zero learner-text markers. `test/offline/invariants/test_inv_009_privacy_boundary.py`
-- **fallback:** reject the ingest, quarantine the source, leave the active version untouched, append a SECURITY event, and block the publish until a human clears it.
+- **statement:** The system accepts only canonical CEFR levels A1, A2, B1, and B2; any other level values must be rejected at the API boundary.
+- **fit_criterion:** Payloads containing levels outside `['A1', 'A2', 'B1', 'B2']` fail schema validation with HTTP 422.
+- **enforced_by:** `api/schemas/profile.py` enumerates the allowed levels.
+- **verification:** `test/offline/test_auth/test_profile.py::test_reject_invalid_cefr`
+- **fallback:** return 422 with a field error; no persistence.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-007 §Decision; ADR-009 §Store inventory
+- **source:** `INV-CEFR-001` in `docs/req/requirements.yaml`
 
-## INV-010 - Audit records are redacted
+## INV-SEC-001 - Read-only vector credentials
 
-- **statement:** Operational and audit records SHALL NOT contain raw learner writing, email, display name or provider keys.
-- **source:** `REQ-LANG-SEC-004`
-- **enforced_by:** `ObservabilityStore.append_turn_event()` (writes a field allowlist; hashes user ref and text; rejects unknown fields)
-- **verification:** 100 sampled events, including a deliberately injected raw-text field; the raw value must be absent; a redaction fixture covers email, Chinese text and a key-like string. `test/offline/invariants/test_inv_010_redaction.py`
-- **fallback:** drop the offending field, write only the allowlisted fields, append a security event to a separate sink without the value, and alert after any redaction failure.
+- **statement:** The runtime application service must use read-only vector database credentials and cannot execute insert, update, or delete commands.
+- **fit_criterion:** Direct SQL/vector write operations executed via the application DB pool raise a permission-denied exception.
+- **enforced_by:** `database/vector_client.py` uses a read-only role; writes raise permission-denied.
+- **verification:** `test/offline/test_database/test_vector_permissions.py::test_runtime_vector_read_only`
+- **fallback:** the write fails with permission-denied; no data changes; log a SECURITY event.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-009 §Privacy rules; ADR-001 §Observability
+- **source:** `INV-SEC-001` in `docs/req/requirements.yaml`
 
-## INV-011 - Memory cannot influence decisions
+## INV-SEC-002 - No upload endpoints
 
-- **statement:** No session summary or vocabulary history SHALL influence quiz scoring, progress totals, authorization or content eligibility.
-- **source:** `REQ-LANG-FR-009`
-- **enforced_by:** `SessionSummaryStore.get()` (owner-scoped read; import contract forbids `AssessmentService`, `ProgressLedger`, `OwnershipGuard`, `RequestAuthenticator` and `ContentPublisher` from importing it)
-- **verification:** import-linter contract plus a behavioural test that changes a summary and asserts scores, totals and authorization are unchanged. `test/offline/invariants/test_inv_011_summary_isolation.py`
-- **fallback:** strip the summary from the prompt, continue with recent history only, record a CRITICAL event, and run the isolation test before the next release.
+- **statement:** The web application and backend API must expose zero user file upload endpoints.
+- **fit_criterion:** API router introspection confirms 0 registered routes accepting `multipart/form-data` or file payloads.
+- **enforced_by:** `main.py` registers no upload routes.
+- **verification:** `test/offline/test_api/test_routes.py::test_no_upload_endpoints_exposed`
+- **fallback:** unroutable; no upload path exists.
 - **status:** declared
-- **round:** 1
-- **adr:** ADR-009 §Decision; ADR-006 §Assembly pipeline
+- **source:** `INV-SEC-002` in `docs/req/requirements.yaml`
+
+## INV-PROG-001 - Progress derived from events
+
+- **statement:** Dashboard progress metrics must be aggregated deterministically from verified database events and never from LLM output.
+- **fit_criterion:** Progress response counts exactly match SQL `COUNT(*)` queries from the `learning_events` table.
+- **enforced_by:** `user_progress/service.py` reads aggregate counts directly; no model narrative path.
+- **verification:** `test/offline/test_user_progress/test_dashboard.py::test_progress_derived_from_events`
+- **fallback:** recompute directly from events; if parity fails, return 503 and hide numeric cards; log a CRITICAL event.
+- **status:** declared
+- **source:** `INV-PROG-001` in `docs/req/requirements.yaml`
+
+## INV-CITE-001 - Citation provenance
+
+- **statement:** All displayed lesson citations must match retrieved, published chunk IDs; invalid or missing source IDs must trigger safe abstention.
+- **fit_criterion:** Tutor responses with unverified citation IDs are discarded; response falls back to an insufficient-evidence disclosure.
+- **enforced_by:** `citation_validator.py` checks every source ID against the retrieved published set.
+- **verification:** `test/offline/test_safety_boundary/test_citation_validator.py::test_reject_invalid_citations`
+- **fallback:** discard the entire answer; return an abstention with the limitation phrase; log `validation_result=rejected_citation` at CRITICAL.
+- **status:** declared
+- **source:** `INV-CITE-001` in `docs/req/requirements.yaml`
 
 ---
 
-## Verification protocol (V2)
+## Verification protocol
 
 Each invariant's test must satisfy three conditions before the status can move to `verified`:
 
 1. **It fails on the broken build.** The evidence is a logbook row with the failing assertion, not a reviewer's statement.
-2. **It exercises the violation path,** not a happy path with an assertion attached. A test that passes on a build where the validator is bypassed proves nothing.
-3. **It names the invariant and requirement in its docstring,** e.g. `"""INV-002 / REQ-LANG-INV-002: unknown source id must not render."""`; `test/structural/test_docstring_trace.py` checks the tag.
+2. **It exercises the violation path,** not a happy path with an assertion attached. A test that passes on a build where the enforcement is bypassed proves nothing.
+3. **It names the invariant and requirement in its docstring,** e.g. `"""INV-SCOPE-001: scope result must precede any downstream call."""`.
 
 ## Done-when status at baseline
 
-- [ ] Each invariant has a test that fails when the invariant is violated (planned; `DBT-003`).
+- [ ] Each invariant has a test that fails when the invariant is violated (`DBT-003`).
 - [ ] Each fallback is an action the code can take without a human (designed; not implemented).
-- [x] Each `enforced_by` names exactly one module from the blueprint component table.
-- [x] Round-1 rows only; any round-2 invariant is appended, never merged into an existing row.
-- [x] Every row cites exactly one source requirement and at least one ADR section.
+- [x] Each `enforced_by` names exactly one module matching an SSOT `enforcing_component` path.
+- [x] The register contains exactly the 13 SSOT invariant requirements; no extra or missing rows.

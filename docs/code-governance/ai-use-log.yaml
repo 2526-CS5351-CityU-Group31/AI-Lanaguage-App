@@ -25,3 +25,12 @@ sessions:
       - "architecture-blueprint.md"
       - "docs/README.md"
     human_interventions: "Agent moved docs/ai-use-log.yaml to docs/code-governance/ai-use-log.yaml, updated all doc references, and removed docs/README.md. The human modified .github/workflows/ci.yml personally to fix the schema-validation path (line 91), since CI is a frozen human-only path."
+  - session_id: "SES-003"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B consolidation step 1: rebuild invariants.md to the 13 SSOT invariants (removing legacy invariants with no SSOT backing)."
+    files_touched:
+      - "docs/architecture/invariants.md"
+    human_interventions: "Human approved decisions Q1=nested src/backend layout, Q2=direct in-place ID remap plus logbook row, Q3=1,500-token budget (SSOT wins), and Q4=remove content not covered by SSOT. Human approved the proposed invariants.md before the agent wrote it; agent verified the register has exactly the 13 SSOT invariant IDs (no extras, no missing)."
