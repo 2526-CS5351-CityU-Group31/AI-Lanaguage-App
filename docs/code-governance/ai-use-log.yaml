@@ -134,3 +134,12 @@ sessions:
     files_touched:
       - "docs/architecture/memory-design.md"
     human_interventions: "Human chose to rescope rather than delete. Agent rebuilt the doc around the SSOT-backed store inventory and owner-scoped isolation, with a scope note explaining the removed memory content; verified no legacy IDs, all IDs resolve to SSOT."
+  - session_id: "SES-015"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B step 6b: rebuild runtime-policy-catalog.md to the 13 SSOT invariants (RP-001..RP-017); remove checkpoint/summary/quiz/retired-mid-flight/canary/redaction policies; add scope/CEFR/upload/token-budget policies."
+    files_touched:
+      - "docs/architecture/runtime-policy-catalog.md"
+    human_interventions: "Human approved the proposed RP-001..RP-017 ID scheme. Agent rebuilt the policy table, retry budgets, coverage decisions and invariant-coverage check to the 13 SSOT invariants; verified no legacy IDs, all 13 invariants covered, no removed-content refs."
