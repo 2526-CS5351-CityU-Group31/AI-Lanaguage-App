@@ -34,3 +34,12 @@ sessions:
     files_touched:
       - "docs/architecture/invariants.md"
     human_interventions: "Human approved decisions Q1=nested src/backend layout, Q2=direct in-place ID remap plus logbook row, Q3=1,500-token budget (SSOT wins), and Q4=remove content not covered by SSOT. Human approved the proposed invariants.md before the agent wrote it; agent verified the register has exactly the 13 SSOT invariant IDs (no extras, no missing)."
+  - session_id: "SES-004"
+    date: "2026-11-02"
+    member: "Adrian"
+    branch: "docs/align-architecture-files"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Tier B consolidation step 2: regenerate trace-matrix.md with exactly 31 rows, one per SSOT requirement."
+    files_touched:
+      - "docs/architecture/trace-matrix.md"
+    human_interventions: "Human reviewed the generated 31-row matrix inline and approved before the agent wrote it. Agent verified ID set matches the SSOT exactly (31/31, no missing, extra, or duplicate rows)."
