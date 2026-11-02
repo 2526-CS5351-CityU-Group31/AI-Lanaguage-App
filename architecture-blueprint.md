@@ -298,6 +298,7 @@ docs/
     evaluation-table.md
     runtime-policy-catalog.md
     configuration-governance.md
+    role-ownership.md
   code-governance/{structural-constraints.md, verification-constraints.md, mcp-tool-manifest.md,
                    ai-use-log.yaml, ai-use-log-schema.json}
   review-memo.md
