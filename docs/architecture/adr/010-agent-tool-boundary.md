@@ -4,7 +4,7 @@
 - **Date:** 2026-10-27
 - **Supersedes:** -
 - **Decision owner:** Member 5 (QA & Governance) with Member 1 (Requirements & PM)
-- **Related requirements:** REQ-LANG-GOV-004, REQ-LANG-GOV-005, REQ-LANG-ARCH-001, REQ-LANG-ARCH-002, REQ-LANG-SEC-002, REQ-LANG-SEC-003
+- **Related requirements:** NFR-GOV-001, NFR-GOV-002, INV-SEC-002, FR-CORP-001
 - **Related artifacts:** `docs/code-governance/mcp-tool-manifest.md`, `docs/architecture/permission-model.md`, `.opencode/permissions.jsonc`, `.opencode/rules.md`, `.agent/rules.md`, `AGENTS.md`, `Prompt.md`, `docs/code-governance/ai-use-log.yaml`
 - **Review triggers:** `unapproved_implementation_commits > 0`; `ai_log_gap_count > 0`; a manifest/table drift detected by `scripts/check_manifest.py`; a permission-hook denial bypassed; a new tool or role requested; an agent writes a protected path; a transcript is missing for a merged PR.
 
@@ -28,16 +28,16 @@ The manifest is derived from this ADR and the permission model. Direct shell acc
 | `Build` | Implement the approved plan within permissions, add tests, run offline checks | `read_registry_slice`, `validate_registry`, `run_structural_checks`, `run_offline_suite`, `append_ai_session`, `apply_migration`, `run_eval_replay` (offline only) | `record_plan_approval`, `write_frozen_path`, `publish_content`, live eval without human approval |
 | `Verify` | Run Tiers 1-3, produce evidence, update trace status and the evaluation logbook | `read_registry_slice`, `validate_registry`, `run_structural_checks`, `run_offline_suite`, `run_eval_replay` (live with approval), `append_ai_session` | Any `src/` write, threshold change, approval tool, content publish |
 | `Human approver` | Approve plan, protected paths, ADR, baseline, release | All tools, including `record_plan_approval`, `write_frozen_path`, `publish_content` | Nothing by role; must not self-approve a change they authored |
-| `Human content reviewer` | Review licence and pedagogy, publish/retire a content version | `ingest_content_dry_run`, `publish_content`, `read_registry_slice` | Learner data, source code, CI |
+| Human content reviewer | Review licence and pedagogy, approve offline ingestion | `ingest_content_dry_run`, `publish_content`, `read_registry_slice` | Learner data, source code, CI |
 
 ## Approval gates
 
 | Gate | Artifact | Who signs | What it proves | Enforcement |
 |---|---|---|---|---|
-| G1 Plan approval | Plan artifact with requirement IDs, files, interfaces, negative tests, rollback; recorded in the PR/issue | Human approver | Code follows an approved plan, not a spontaneous agent decision | `scripts/check_test_approval.py` (planned), `REQ-LANG-GOV-005` |
+| G1 Plan approval | Plan artifact with requirement IDs, files, interfaces, negative tests, rollback; recorded in the PR/issue | Human approver | Code follows an approved plan, not a spontaneous agent decision | `scripts/check_test_approval.py` (planned), `NFR-GOV-001` |
 | G2 Test approval | Test names and fit criteria listed in the plan; approval predates implementation | Human approver | Tests were designed before they were made to pass | Same script; reviewer verifies timestamp |
 | G3 Protected-path write | Human-authored change + ADR reference | Human approver | Authority modules, prompts, CI, permissions and baselines are not agent-editable | `permissions.jsonc` hook `guard_protected_path` |
-| G4 Content publication | Manifest with licence, reviewer, checksum, version | Human content reviewer | Only reviewed, licensed content is served | `publish_content` tool + `ContentPublisher` |
+| G4 Content ingest approval | Manifest with licence, reviewer, checksum | Human content reviewer | Only reviewed, licensed content is ingested and served | `ingest_content_dry_run` tool + `IngestPipeline` (`FR-CORP-001`) |
 | G5 Release | Passed Tier 1/2/3 evidence, rollback step, AI log entry | Release owner | A release is evidence-backed and reversible | CI + review memo |
 
 An approval is valid only if it references the plan revision it approved. A materially changed plan requires a new approval; appending implementation detail inside the approved scope does not.
@@ -64,10 +64,10 @@ Every tool's rejection behaviour is typed (`SCHEMA_INVALID`, `CALLER_NOT_ALLOWED
 
 | Option | Failed criterion | Evidence |
 |---|---|---|
-| Unrestricted shell and file access for every agent | Enforcement: a protected path is only protected by the model's willingness to obey | `evaluation-table.md` C4; `REQ-LANG-GOV-005` |
-| Agent self-approval of its own plan | Authority separation: the planner and approver are the same principal; the gate becomes a formality | G1, `REQ-LANG-GOV-005` |
+| Unrestricted shell and file access for every agent | Enforcement: a protected path is only protected by the model's willingness to obey | `evaluation-table.md` C4; `NFR-GOV-001` |
+| Agent self-approval of its own plan | Authority separation: the planner and approver are the same principal; the gate becomes a formality | G1, `NFR-GOV-001` |
 | Hand-written tool list without an ADR source | Maintainability: tools drift from architecture and no one can say why a tool exists | `mcp-tool-manifest.md` derivation rule |
-| Fully autonomous multi-agent build | Reviewability: no single approved plan or responsible human; the course requires a human gate | `Prompt.md` D9, `REQ-LANG-GOV-004` |
+| Fully autonomous multi-agent build | Reviewability: no single approved plan or responsible human; the course requires a human gate | `Prompt.md` D9, `NFR-GOV-002` |
 | One role for plan, build and verify | Test independence: the builder verifies its own work and can relax a threshold | G2/G3, `verification-constraints.md` V2 |
 
 ## Responsibility map
@@ -121,3 +121,4 @@ Every tool's rejection behaviour is typed (`SCHEMA_INVALID`, `CALLER_NOT_ALLOWED
 | Date | Change | Evidence |
 |---|---|---|
 | 2026-10-27 | Initial agent boundary accepted at baseline R1 | `evaluation-logbook.md` 2026-10-27; `permission-model.md` |
+| 2026-11-02 | Remapped to SSOT IDs (NFR-GOV-001/002, INV-SEC-002, FR-CORP-001); G4 reframed to ingest approval | This consolidation; `trace-matrix.md` NFR-GOV-001 / NFR-GOV-002 rows |
