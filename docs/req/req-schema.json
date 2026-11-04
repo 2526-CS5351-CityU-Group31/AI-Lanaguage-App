@@ -1,383 +1,59 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cs5351.example/schemas/lang/req-schema.json",
-  "title": "CS5351 LANG requirement registry",
-  "description": "Structural schema for docs/req/requirements.yaml. It validates the shape, required fields, controlled vocabularies, identifier formats and conditional fields of the requirement registry. Cross-record rules that JSON Schema cannot express are listed in $comment and must be enforced by scripts/validate_req.py after this schema passes.",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CS5351 Requirements Registry Schema",
   "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schema_version",
-    "project",
-    "baseline",
-    "frozen_on",
-    "frozen_by",
-    "clusters",
-    "requirements",
-    "delta"
-  ],
-  "$comment": "Semantic checks intentionally left to scripts/validate_req.py: (1) requirement ids are unique and never reused; (2) clusters[].driver_requirements and requirements[].cluster resolve to each other; (3) the id type segment matches requirements[].type (ARCH=architectural_constraint, INV=invariant, SEC=security, FR=functional, NFR=quality, PERF=performance, COST=cost, GOV=governance); (4) every asr:true requirement names exactly one forces_element that exists in architecture-blueprint.md section 4; (5) every delta added/modified/obsoleted id resolves to a requirement entry and every requirement is covered by a delta; (6) every must requirement has a runnable fit_criterion.measurement. Also note: frozen_on is an ISO 8601 string; a YAML loader that coerces unquoted dates to date objects must serialise it as YYYY-MM-DD before validation.",
+  "required": ["project", "version", "last_updated", "requirements"],
   "properties": {
-    "schema_version": {
-      "type": "string",
-      "const": "1.0",
-      "description": "Version of this registry contract. Bump this const and the schema when a required field or enum changes."
-    },
-    "project": {
-      "type": "string",
-      "pattern": "^[A-Z]{2,12}$",
-      "description": "Short project code used as the second segment of every requirement id, for example LANG."
-    },
-    "baseline": {
-      "type": "string",
-      "pattern": "^R[0-9]+$",
-      "description": "Immutable baseline id, for example R1."
-    },
-    "frozen_on": {
-      "type": "string",
-      "format": "date",
-      "description": "ISO 8601 freeze date, YYYY-MM-DD."
-    },
-    "frozen_by": {
-      "type": "string",
-      "minLength": 3,
-      "description": "Named person or role that froze the baseline."
-    },
-    "clusters": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": {
-        "$ref": "#/$defs/cluster"
-      }
-    },
+    "project": { "type": "string" },
+    "version": { "type": "string" },
+    "last_updated": { "type": "string", "format": "date" },
     "requirements": {
       "type": "array",
-      "minItems": 1,
       "items": {
-        "$ref": "#/$defs/requirement"
-      },
-      "description": "One entry per requirement. Id uniqueness is checked by scripts/validate_req.py because JSON Schema cannot constrain object property values to be unique across array items."
-    },
-    "delta": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/deltaEntry"
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "statement",
+          "fit_criterion",
+          "priority",
+          "tradeoff",
+          "enforcing_component",
+          "verification_method",
+          "owner"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(FR|NFR|INV)-[A-Z0-9]+-[0-9]{3}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "functional",
+              "invariant",
+              "quality",
+              "performance",
+              "cost",
+              "governance",
+              "security"
+            ]
+          },
+          "statement": { "type": "string" },
+          "fit_criterion": { "type": "string" },
+          "priority": {
+            "type": "string",
+            "enum": ["Must", "Should", "Could", "Wont"]
+          },
+          "tradeoff": { "type": "string" },
+          "enforcing_component": { "type": "string" },
+          "verification_method": { "type": "string" },
+          "owner": { "type": "string" },
+          "source": { "type": "string" }
+        },
+        "additionalProperties": false
       }
     }
   },
-  "$defs": {
-    "priority": {
-      "type": "string",
-      "enum": [
-        "must",
-        "should",
-        "could",
-        "wont"
-      ],
-      "description": "MoSCoW priority. Use the exact lower-case token."
-    },
-    "status": {
-      "type": "string",
-      "enum": [
-        "draft",
-        "baselined",
-        "implemented",
-        "verified",
-        "retired"
-      ],
-      "description": "Requirement lifecycle status."
-    },
-    "requirementId": {
-      "type": "string",
-      "pattern": "^REQ-[A-Z]+-(FR|NFR|INV|GOV|SEC|ARCH|COST|PERF)-[0-9]{3}$",
-      "description": "Stable requirement id: REQ-<project>-<type>-<three digit number>."
-    },
-    "clusterId": {
-      "type": "string",
-      "pattern": "^CL-[A-Z][A-Z-]*$",
-      "description": "Cluster id named after the architectural concern, for example CL-AUTHORITY."
-    },
-    "fitCriterion": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "kind",
-        "metric",
-        "threshold",
-        "measurement",
-        "on_fail"
-      ],
-      "properties": {
-        "kind": {
-          "type": "string",
-          "enum": [
-            "machine_checkable",
-            "measurable",
-            "structural"
-          ],
-          "description": "Use structural when the criterion is proved by an import, module or configuration check; measurable when a number is observed; machine_checkable when a script or test decides pass/fail."
-        },
-        "metric": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_]*$",
-          "minLength": 3,
-          "description": "Snake-case metric or property name."
-        },
-        "threshold": {
-          "type": "string",
-          "minLength": 5,
-          "description": "Metric + threshold + sample size, for example '== 0 across 64 replay cases'."
-        },
-        "measurement": {
-          "type": "string",
-          "minLength": 5,
-          "description": "Exact command or test id a fresh checkout can run."
-        },
-        "on_fail": {
-          "type": "string",
-          "minLength": 5,
-          "description": "Concrete fallback action when the threshold is missed."
-        }
-      }
-    },
-    "source": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "kind",
-        "ref"
-      ],
-      "properties": {
-        "kind": {
-          "type": "string",
-          "enum": [
-            "existing_system",
-            "stakeholder",
-            "regulation"
-          ],
-          "description": "Where the requirement came from."
-        },
-        "ref": {
-          "type": "string",
-          "minLength": 3,
-          "description": "Resolvable source reference, for example 'path/to/file.md:42' or 'project brief section 3'."
-        }
-      }
-    },
-    "cluster": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "name",
-        "priority",
-        "responsibility",
-        "driver_requirements"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/clusterId"
-        },
-        "name": {
-          "type": "string",
-          "minLength": 3,
-          "description": "Concern name, not a requirement id."
-        },
-        "priority": {
-          "$ref": "#/$defs/priority"
-        },
-        "responsibility": {
-          "type": "string",
-          "minLength": 10,
-          "description": "The distinct architectural responsibility this cluster owns."
-        },
-        "driver_requirements": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/requirementId"
-          }
-        }
-      }
-    },
-    "requirement": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "type",
-        "statement",
-        "rationale",
-        "fit_criterion",
-        "priority",
-        "asr",
-        "cluster",
-        "status",
-        "owner"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/requirementId"
-        },
-        "type": {
-          "type": "string",
-          "enum": [
-            "functional",
-            "invariant",
-            "quality",
-            "performance",
-            "cost",
-            "governance",
-            "security",
-            "architectural_constraint"
-          ]
-        },
-        "statement": {
-          "type": "string",
-          "minLength": 10,
-          "pattern": "SHALL",
-          "description": "One normative sentence using SHALL or SHALL NOT."
-        },
-        "rationale": {
-          "type": "string",
-          "minLength": 10,
-          "description": "Why the requirement exists."
-        },
-        "fit_criterion": {
-          "$ref": "#/$defs/fitCriterion"
-        },
-        "priority": {
-          "$ref": "#/$defs/priority"
-        },
-        "priority_tradeoff": {
-          "type": "string",
-          "minLength": 10,
-          "description": "What is given up by insisting on this priority. Required for must."
-        },
-        "asr": {
-          "type": "boolean",
-          "description": "True only when the requirement is architecturally significant."
-        },
-        "forces_element": {
-          "type": "string",
-          "pattern": "^[A-Z][A-Za-z0-9_.()]*$",
-          "description": "The single architectural element this ASR forces; must resolve to a name in architecture-blueprint.md section 4."
-        },
-        "cluster": {
-          "$ref": "#/$defs/clusterId"
-        },
-        "source": {
-          "$ref": "#/$defs/source"
-        },
-        "status": {
-          "$ref": "#/$defs/status"
-        },
-        "owner": {
-          "type": "string",
-          "minLength": 3,
-          "description": "Named person or role, never the whole team."
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "priority": {
-                "const": "must"
-              }
-            },
-            "required": [
-              "priority"
-            ]
-          },
-          "then": {
-            "required": [
-              "priority_tradeoff"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "asr": {
-                "const": true
-              }
-            },
-            "required": [
-              "asr"
-            ]
-          },
-          "then": {
-            "required": [
-              "forces_element"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "asr": {
-                "const": false
-              }
-            },
-            "required": [
-              "asr"
-            ]
-          },
-          "then": {
-            "not": {
-              "required": [
-                "forces_element"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    "deltaEntry": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "baseline",
-        "added",
-        "modified",
-        "obsoleted",
-        "trigger"
-      ],
-      "properties": {
-        "baseline": {
-          "type": "string",
-          "pattern": "^R[0-9]+$"
-        },
-        "added": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/requirementId"
-          }
-        },
-        "modified": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/requirementId"
-          }
-        },
-        "obsoleted": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/requirementId"
-          }
-        },
-        "trigger": {
-          "type": "string",
-          "minLength": 10,
-          "description": "Why this baseline delta exists."
-        }
-      }
-    }
-  }
+  "additionalProperties": false
 }

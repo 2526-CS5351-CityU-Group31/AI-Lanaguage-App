@@ -25,21 +25,20 @@
 | `docs/code-governance/structural-constraints.md` | read | read | read | yes | hook `guard_frozen` | declared |
 | `docs/code-governance/verification-constraints.md` | read | read | read | yes | hook `guard_frozen` | declared |
 | `docs/code-governance/mcp-tool-manifest.md` | read | read | read | yes | hook `guard_manifest` | declared |
-| `docs/ai-use-log.yaml` | read | append only via `append_ai_session` | read | session owner verifies | hook `guard_ai_log_append` | declared |
+| `docs/code-governance/ai-use-log.yaml` | read | append only via `append_ai_session` | read | session owner verifies | hook `guard_ai_log_append` | declared |
 | `docs/review-memo.md` | read | read | read | yes - reviewer only | hook `guard_review` | declared |
 | `docs/debt-register.md`, `docs/bug-diary.md` | read | append (new rows) | append (new rows) | yes for closing a row | hook `guard_append_only` | declared |
-| `docs/README.md` | read | guarded write | read | reviewer | hook `guard_docs` | declared |
-| `src/response_validator.py` | read | **no access** | read | yes - human author + ADR | hook `guard_authority_module` | declared |
-| `src/ownership_guard.py` | read | **no access** | read | yes - human author + ADR | hook `guard_authority_module` | declared |
-| `src/degradation_controller.py` | read | **no access** | read | yes - human author + ADR | hook `guard_authority_module` | declared |
-| `src/tutor_pipeline.py` | read | guarded write | read | yes - gate order change | hook `guard_gate_call` | declared |
-| `src/retrieval_service.py` | read | guarded write | read | yes - filter change | hook `guard_retrieval_filter` | declared |
-| `src/content_publisher.py` | read | guarded write | read | yes - publish semantics | hook `guard_content_publisher` | declared |
-| `src/assessment_service.py`, `src/progress_ledger.py` | read | guarded write | read | yes - score/event semantics | hook `guard_record_path` | declared |
-| `src/config.py` | read | guarded write | read | yes - new env key + config doc | hook `guard_config` | declared |
-| `src/**` (all other modules) | read | guarded write | read | plan approval + reviewer | `permissions.jsonc` | declared |
-| `src/contracts/**`, `src/db/**` | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
-| `frontend/**` | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
+| `src/backend/safety_boundary/scope_guard.py` | read | **no access** | read | yes - human author + ADR | hook `guard_authority_module` | declared |
+| `src/backend/safety_boundary/citation_validator.py` | read | **no access** | read | yes - human author + ADR | hook `guard_authority_module` | declared |
+| `src/backend/auth/security.py` | read | **no access** | read | yes - human author + ADR | hook `guard_authority_module` | declared |
+| `src/backend/ai_companion/rag_pipeline.py` | read | guarded write | read | yes - gate order change | hook `guard_gate_call` | declared |
+| `src/backend/ai_companion/retrieval_adapter.py` | read | guarded write | read | yes - filter change | hook `guard_retrieval_filter` | declared |
+| `scripts/ingest_content.py` | read | guarded write | read | yes - ingest semantics | hook `guard_content_publisher` | declared |
+| `src/backend/user_progress/service.py` | read | guarded write | read | yes - event semantics | hook `guard_record_path` | declared |
+| config module (`src/backend/` config) | read | guarded write | read | yes - new env key + config doc | hook `guard_config` | declared |
+| `src/backend/**` (all other modules) | read | guarded write | read | plan approval + reviewer | `permissions.jsonc` | declared |
+| `src/backend/contracts/**`, `src/backend/db/**` | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
+| `src/frontend/**` | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
 | `test/structural/**`, `test/offline/**`, `test/live/**` | read | guarded write only after test approval | read/append evidence | approval artifact (`G2`) | hook `guard_test_approval` | declared |
 | `scripts/validate_req.py`, `scripts/check_*.py`, `scripts/run_eval.py` | read | **no access** | read | yes - gate integrity | hook `guard_gate_scripts` | declared |
 | `scripts/**` (other) | read | guarded write | read | reviewer | `permissions.jsonc` | declared |
@@ -51,7 +50,7 @@
 | `.github/workflows/**` | read | **no access** | read | yes | hook `guard_ci` | declared |
 | `.opencode/permissions.jsonc`, `.agent/rules.md` | read (no config) | **no access** | **no access** | yes | hook `guard_agent_config` | declared |
 | `AGENTS.md`, `Prompt.md`, `Report.md` | read | read | read | yes - human author | hook `guard_frozen` | declared |
-| `README.md`, `docker-compose.yml`, `.env.example`, `pyproject.toml`, `frontend/package.json` | read | guarded write | read | dependency change needs an ADR | `permissions.jsonc` | declared |
+| `README.md`, `docker-compose.yml`, `.env.example`, `pyproject.toml`, `src/frontend/package.json` | read | guarded write | read | dependency change needs an ADR | `permissions.jsonc` | declared |
 | `.env`, `.env.*` (except `.env.example`), any secret file | **no access** | **no access** | **no access** | humans via secret store only | hook `guard_secret` | declared |
 | `reports/**`, `.pytest_cache/**`, test temp files | read | write | write | no | `permissions.jsonc` | declared |
 | Any path not listed | **no access** | **no access** | **no access** | yes | default deny | declared |
@@ -60,15 +59,15 @@
 
 ## 2. Invariant-bearing paths
 
-The three modules that contain the validator, the ownership gate and the failure-action switch are **no access** for the Build agent. They are the paths where a one-line change can silently disable an invariant:
+The three modules that contain the scope gate, the citation validator and the identity/ownership gate are **no access** for the Build agent. They are the paths where a one-line change can silently disable an invariant:
 
 | Path | Invariant(s) | Why human-only | Change process |
 |---|---|---|---|
-| `src/response_validator.py` | INV-001, INV-002, INV-007 | The gate itself; a "small fix" can turn a rejection into a pass-through | Human author, ADR-005 reference, failing-before/passing-after test, two reviewers |
-| `src/ownership_guard.py` | INV-003 | The isolation gate; a default-allow branch exposes every learner | Human author, ADR-001 reference, 20-probe negative suite, two reviewers |
-| `src/degradation_controller.py` | INV-006, INV-008, NFR-006 | The failure switch; a wrong branch can bypass validation on an error path | Human author, runtime policy row, fault-injection test, two reviewers |
+| `src/backend/safety_boundary/scope_guard.py` | INV-SCOPE-001, INV-SCOPE-002, INV-SCOPE-004, INV-SCOPE-005, NFR-QUAL-004 | The admission gate; a "small fix" can let an off-topic prompt reach the model | Human author, ADR-005 reference, failing-before/passing-after test, two reviewers |
+| `src/backend/safety_boundary/citation_validator.py` | INV-CITE-001, NFR-QUAL-003 | The citation gate; a misplaced branch can turn an abstention into a pass-through | Human author, ADR-005 reference, failing-before/passing-after test, two reviewers |
+| `src/backend/auth/security.py` | INV-AUTH-001 | The isolation gate; a default-allow branch exposes every learner | Human author, ADR-009 reference, 20-probe negative suite, two reviewers |
 
-Other invariant-enforcing modules are **guarded write**, not no-access: `TutorPipeline`, `RetrievalService`, `ContentPublisher`, `AssessmentService`, `ProgressLedger`, `SessionSummaryStore`, `ObservabilityStore`, `PromptAssembler`. They are buildable, but a change to their enforcement logic requires an approved plan, a named test and a reviewer who is not the author. This is a deliberate balance: the gate code is human-authored, the surrounding services are agent-buildable under guard.
+Other invariant-enforcing modules are **guarded write**, not no-access: `ChatRouter`, `RetrievalAdapter`, `IngestPipeline`, `ProgressService`, `PromptAssembler`, `ProfileSchema`. They are buildable, but a change to their enforcement logic requires an approved plan, a named test and a reviewer who is not the author. This is a deliberate balance: the gate code is human-authored, the surrounding services are agent-buildable under guard.
 
 ## 3. Enforcement mapping
 
@@ -100,13 +99,13 @@ Other invariant-enforcing modules are **guarded write**, not no-access: `TutorPi
 - **Who:** the release owner (Member 5 at baseline) or the on-call human, never an agent.
 - **When:** a production incident requires a hotfix to a protected path, or a rollback cannot wait for the normal ADR cycle.
 - **What:** a break-glass write is allowed only with a recorded incident id, a two-person approval and a rollback plan. The change is annotated in the commit message with `BREAK-GLASS: <incident>`.
-- **Record:** an entry in `docs/ai-use-log.yaml`, a `review-memo.md` memo and an `evaluation-logbook.md` row within 24 hours; an ADR within 5 working days.
+- **Record:** an entry in `docs/code-governance/ai-use-log.yaml`, a `review-memo.md` memo and an `evaluation-logbook.md` row within 24 hours; an ADR within 5 working days.
 - **Limit:** the emergency path may not disable an invariant test, remove a citation check or grant a model tool access. Those are not hotfixes; they are re-architecture.
 
 ## 6. Done-when status
 
-- [x] Every path in the repository tree is listed or covered by an explicit wildcard (45 rows including the default-deny row).
-- [x] The three gate modules are exactly the `no access` rows; other invariant services are guarded write with a named reason.
+- [x] Every path in the repository tree is listed or covered by an explicit wildcard.
+- [x] The three gate modules (`scope_guard.py`, `citation_validator.py`, `auth/security.py`) are exactly the `no access` rows; other invariant services are guarded write with a named reason.
 - [ ] `permissions.jsonc` and this table are isomorphic and `scripts/check_permissions.py` fails on drift (`DBT-003`).
 - [ ] Hooks `guard_frozen`, `guard_authority_module`, `guard_prompt`, `guard_content`, `guard_ci`, `guard_migrations`, `guard_secret`, `guard_test_approval`, `guard_ai_log_append` are implemented (`DBT-003`).
 - [ ] A deliberate denial is demonstrated in a safe branch and preserved as evidence (`DBT-003`).

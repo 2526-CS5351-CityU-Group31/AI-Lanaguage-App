@@ -20,6 +20,7 @@
 | L-010 | 2026-10-27 | guardrail test | The permission table lists 45 rows including the default-deny row; every top-level path in blueprint §11 is covered. Hooks and `permissions.jsonc` are unimplemented, so enforcement is `declared`. | `permission-model.md` §1; blueprint §11 tree | `permission-model.md`; `debt-register.md` DBT-004 |
 | L-011 | 2026-10-27 | structural | The risk register has 15 open assumptions, 0 mitigated and 0 closed; every row has a numeric trigger and a named element or gate. | `risk-list.md` §1; status counts | `risk-list.md`; `debt-register.md` DBT-009 |
 | L-012 | 2026-10-27 | incident | No incidents have occurred; the project has no runtime. This row is a placeholder for the first incident review and is not evidence of safety. | Repository state at baseline; no deployment | none |
+| L-013 | 2026-11-02 | structural | The documentation set was re-aligned to the SSOT registry (31 requirements, 13 invariants, 18 modules). Prior rows L-002/L-003/L-004/L-005/L-009/L-011 describe the earlier 39-requirement / 11-invariant / 8k-token baseline and are retained unchanged as history, per the append-only rule (any `REQ-LANG-*` / numeric `INV-###` in them is historical, not current). | `requirements.yaml` count 31; `invariants.md` 13; `structural-constraints.md` 18 modules; ADR-006 1,500-token budget | `invariants.md`, `trace-matrix.md`, `structural-constraints.md`, `verification-constraints.md`, ADR-001/005/006/007/008/009/010, `runtime-policy-catalog.md`, `risk-list.md`, `option-ledger.md`, `memory-design.md` |
 
 ## 2. Threshold relaxations
 
@@ -30,7 +31,7 @@
 | Category | Rows | Notes |
 |---|---|---|
 | candidate review | L-001, L-004 | Documentation evidence only; no runtime benchmark |
-| structural | L-002, L-003, L-007, L-009, L-010, L-011 | Counts and arithmetic, reproducible from the files |
+| structural | L-002, L-003, L-007, L-009, L-010, L-011, L-013 | Counts and arithmetic, reproducible from the files |
 | guardrail test | L-005, L-010 | Static coverage only; no failing test exists yet |
 | SEM evaluation | L-006 | Targets adopted; no measured value |
 | incident | L-012 | No incident; placeholder |
