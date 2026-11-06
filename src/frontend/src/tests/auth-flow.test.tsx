@@ -17,7 +17,7 @@ import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
 
-import { handlers } from "./msw/handlers";
+import { handlers, testMe } from "./msw/handlers";
 import { AuthProvider } from "../auth/AuthContext";
 import { ProtectedRoute } from "../auth/ProtectedRoute";
 import LoginPage from "../pages/LoginPage";
@@ -37,6 +37,24 @@ function renderApp(ui: React.ReactNode) {
   );
 }
 
+/**
+ * Render inside AuthProvider and wait for its asynchronous GET /me session
+ * initialization to settle, so axe and assertions run against a stable tree.
+ * Waits on the observed /me completion via waitFor, never an arbitrary delay.
+ */
+async function renderAppSettled(ui: React.ReactNode) {
+  let meResolved = false;
+  server.use(
+    http.get(`/api/me`, () => {
+      meResolved = true;
+      return HttpResponse.json(testMe, { status: 200 });
+    }),
+  );
+  const view = renderApp(ui);
+  await waitFor(() => expect(meResolved).toBe(true));
+  return view;
+}
+
 describe("FR-AUTH-001 login and register", () => {
   it("FR-AUTH-001: renders a login form and sends credentials with include-credentials", async () => {
     renderApp(<LoginPage />);
@@ -47,8 +65,8 @@ describe("FR-AUTH-001 login and register", () => {
     await waitFor(() => expect(screen.queryByText(/email and password are required/i)).not.toBeInTheDocument());
   });
 
-  it("INV-LANG-001: no language selector is rendered anywhere", () => {
-    renderApp(<LoginPage />);
+  it("INV-LANG-001: no language selector is rendered anywhere", async () => {
+    await renderAppSettled(<LoginPage />);
     expect(screen.queryByLabelText(/language/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/select language/i)).not.toBeInTheDocument();
   });
@@ -142,7 +160,8 @@ describe("FR-PROF-001 profile update and INV-CEFR-001", () => {
 
 describe("VS-16 accessibility", () => {
   it("VS-16: login page has zero critical axe violations", async () => {
-    const { container } = renderApp(<LoginPage />);
+    const { container } = await renderAppSettled(<LoginPage />);
+    await screen.findByRole("form", { name: /log in/i });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
