@@ -16,3 +16,25 @@ Icon
 .Trashes
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
+
+### Secrets (guard_secret): never commit real env or keys
+.env
+.env.*
+!.env.example
+
+### Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+### Tests / eval artefacts
+.deepeval/
+reports/
+coverage.xml
+.coverage
+htmlcov/

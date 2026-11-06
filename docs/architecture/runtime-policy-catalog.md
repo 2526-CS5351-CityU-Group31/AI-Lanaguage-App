@@ -30,6 +30,7 @@
 | RP-015 | Profile/registration payload with `language != 'en'` or an invalid CEFR level | Reject with HTTP 422 field errors; no persistence | Any persistence of a non-English or invalid-level profile | INV-LANG-001, INV-CEFR-001 | Nothing; request is rejected | `test/offline/test_auth/test_profile.py::test_reject_non_english` |
 | RP-016 | Ingestion manifest points outside `content/`, or a chunk contains an email/learner-text marker, or the runtime attempts a vector write | Reject the ingest; quarantine the source; the runtime write raises permission-denied; SECURITY event | Any occurrence to security owner and content owner | FR-CORP-001, INV-SEC-001, INV-SEC-002 | Corpus is unchanged; runtime write is denied | `test/offline/test_scripts/test_ingestion.py::test_admin_ingest_pipeline` |
 | RP-017 | Assembled prompt would exceed the 1,500-token ceiling | Compact history beyond six messages; if still over, reject the over-long current turn with 422 before the model call | Prompt tokens > 1,500 on any turn | NFR-COST-001 | Context length degrades; safety never | `test/offline/test_ai_companion/test_token_budget.py::test_token_cap_enforcement` |
+| RP-018 | Render Free instance has spun down; the next request incurs a cold start (~30-50 s) | Serve the request after wake-up; AI turns may exceed the 12 s target on the first request only; emit `cold_start_total`; daily AI cap remains DB-backed and is not reset (`RP-008`) | Cold-start rate > 5% of production requests in a rolling week | NFR-PERF-001, NFR-COST-001; ADR-011 | First-request latency degrades; safety, isolation and stored records never | `test/offline/test_user_progress/test_dashboard.py::test_cap_survives_restart` |
 
 ## 2. Retry budgets
 
@@ -70,6 +71,8 @@ Two paths from the taught catalogue do not exist at runtime in R1 and are record
 | INV-SEC-002 | RP-016 |
 | INV-PROG-001 | RP-010, RP-011 |
 | INV-CITE-001 | RP-001, RP-003, RP-005 |
+
+ADR-011 adds RP-018 for the Render hosting topology; it covers the cold-start degradation path and the restart-durable AI cap, and does not touch any safety invariant.
 
 All 13 invariants appear in at least one row. No invariant is left with "the happy path handles it".
 

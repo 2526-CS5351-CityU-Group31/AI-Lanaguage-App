@@ -1,0 +1,62 @@
+# Render Blueprint for the AI-Companion backend (ADR-011).
+# Deploy with: Render Dashboard -> New -> Blueprint -> select this repo.
+#
+# Implements: ADR-011 (single web service + managed PostgreSQL/pgvector),
+#   ADR-001 (guarded monolith), configuration-governance (env key table, S5),
+#   INV-SEC-001 (separate runtime role; secrets never committed)
+#
+# Secrets are declared with `sync: false`: Render prompts for them in the
+# dashboard and never stores them in the repository (guard_secret).
+# Non-secret values are set here from configuration-governance.md.
+
+services:
+  - type: web
+    name: ai-companion-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free                     # ADR-011 accepted risk: free-tier cold start
+    region: singapore              # keep co-located with the DB + provider
+    healthCheckPath: /health       # static liveness (RP-011)
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: prod
+      - key: PORT
+        sync: false                # Render injects the port at runtime
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-companion-db
+          property: connectionString
+      - key: SESSION_SECRET
+        sync: false                # >= 32 bytes; set in dashboard
+      - key: LLM_MODE
+        value: live
+      - key: LLM_API_KEY
+        sync: false                # provider key; set in dashboard
+      - key: LLM_MODEL
+        sync: false                # pinned model id; reject latest/*
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: EMBEDDING_DIM
+        value: "1536"
+      - key: PROMPT_VERSION
+        value: prompt_v1.0.0
+      - key: CONTEXT_TOKEN_BUDGET
+        value: "1500"
+      - key: COMPACTION_MESSAGE_LIMIT
+        value: "6"
+      - key: MAX_AI_CALLS_PER_DAY
+        value: "50"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false                # exact https origins; no wildcard
+      - key: LOG_LEVEL
+        value: info
+
+databases:
+  - name: ai-companion-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "16"     # pgvector available; enable extension in migration
+    # The runtime role is created by the migration/ops step with read-only grants
+    # on content_chunks (INV-SEC-001); ingest_admin is used only offline.
