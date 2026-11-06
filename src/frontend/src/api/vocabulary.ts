@@ -4,7 +4,7 @@
  * Element: frontend vocabulary client
  * Implements: FR-VOC-001, FR-VOC-002; ADR-008
  *
- * Provisional field names: definition_en / example_en unless the backend
+ * Provisional field names: definition / example unless the backend
  * specifies otherwise.
  */
 import { apiRequest } from "./client";

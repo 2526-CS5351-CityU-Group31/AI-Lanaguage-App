@@ -6,7 +6,7 @@
  *
  * Element under test: VocabularyPage, VocabularyCard
  * Provisional contract: vocabulary field names are UNCONFIRMED; the plan uses
- * definition_en / example_en unless the backend specifies otherwise.
+ * definition / example unless the backend specifies otherwise.
  * (production modules are created in Gate 3; imports fail until then by design).
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
@@ -34,7 +34,7 @@ function renderVocab() {
 }
 
 describe("FR-VOC-001 random vocabulary", () => {
-  it("FR-VOC-001: renders definition_en and example_en from the backend", async () => {
+  it("FR-VOC-001: renders definition and example from the backend", async () => {
     renderVocab();
     expect(await screen.findByText("resilient")).toBeInTheDocument();
     expect(screen.getByText(/able to recover quickly from difficulty/i)).toBeInTheDocument();

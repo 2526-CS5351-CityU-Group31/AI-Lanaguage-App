@@ -4,7 +4,7 @@
  * Element: frontend vocabulary page
  * Implements: FR-VOC-001, FR-VOC-002; ADR-008
  *
- * Cards and field names come from the backend (definition_en / example_en
+ * Cards and field names come from the backend (definition / example
  * unless the backend specifies otherwise). Familiarity changes are recorded
  * server-side; the UI does not compute mastery.
  */

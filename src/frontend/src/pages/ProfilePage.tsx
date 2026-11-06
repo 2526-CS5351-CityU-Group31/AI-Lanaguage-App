@@ -32,7 +32,7 @@ export default function ProfilePage() {
       const me = await getMe();
       setProfile(me);
       setLevel(me.cefr_level);
-      setGoals(me.learning_goals);
+      setGoals(me.learning_goals ?? "");
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Unable to load profile.");
     } finally {

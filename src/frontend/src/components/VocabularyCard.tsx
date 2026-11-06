@@ -21,8 +21,8 @@ export default function VocabularyCard({
     <article className="vocab-card" aria-label={`Vocabulary: ${card.word}`}>
       <h2>{card.word}</h2>
       {card.sense ? <p className="sense">{card.sense}</p> : null}
-      <p className="definition">{card.definition_en}</p>
-      <p className="example">{card.example_en}</p>
+      <p className="definition">{card.definition}</p>
+      <p className="example">{card.example}</p>
       <p className="meta">
         Level {card.level} · {card.topic}
       </p>

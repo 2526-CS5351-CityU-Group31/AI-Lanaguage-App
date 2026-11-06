@@ -22,7 +22,7 @@ export interface MeResponse {
   email: string;
   language: Language;
   cefr_level: CefrLevel;
-  learning_goals: string;
+  learning_goals: string | null;
 }
 
 export interface RegisterRequest {
@@ -137,11 +137,10 @@ export interface VocabularyCard {
   entry_id: string;
   word: string;
   sense: string;
-  definition_en: string;
-  example_en: string;
+  definition: string;
+  example: string;
   level: CefrLevel;
   topic: string;
-  review_status: "published";
 }
 
 /** FR-VOC-002: three-tier familiarity state. */

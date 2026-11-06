@@ -11,14 +11,14 @@
  * Unconfirmed (provisional) contracts referenced here:
  * - Citation metadata shape        (assumed: sources[{source_id,title,section}])
  * - Chat request fields            (assumed: {learner_mode,message,topic?,request_id})
- * - Vocabulary field names         (assumed: definition_en / example_en unless backend differs)
+ * - Vocabulary field names         (assumed: definition / example unless backend differs)
  */
 import { http, HttpResponse } from "msw";
 
 const api = "/api";
 
 export const testMe = {
-  id: "user_test_001",
+  user_id: "user_test_001",
   email: "learner@example.com",
   language: "en",
   cefr_level: "B1",
@@ -36,11 +36,10 @@ const vocabularyCard = {
   entry_id: "voc_001",
   word: "resilient",
   sense: "able to recover quickly",
-  definition_en: "Able to recover quickly from difficulty.",
-  example_en: "She stayed resilient after the setback.",
+  definition: "Able to recover quickly from difficulty.",
+  example: "She stayed resilient after the setback.",
   level: "B1",
   topic: "work",
-  review_status: "published",
 };
 
 export const handlers = [
