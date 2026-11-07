@@ -8,6 +8,14 @@
 # Secrets are declared with `sync: false`: Render prompts for them in the
 # dashboard and never stores them in the repository (guard_secret).
 # Non-secret values are set here from configuration-governance.md.
+#
+# NOTE: the PostgreSQL instance is provisioned MANUALLY (not via this
+# blueprint), so there is no `databases:` block. DATABASE_URL uses the
+# Render-internal connection string, which is only reachable from Render.
+#
+# DATABASE_URL and SESSION_SECRET are intentionally NOT declared here so this
+# Blueprint does not manage (and cannot blank) them on sync. Set both directly
+# in the Render dashboard's Environment tab and keep them there.
 
 services:
   - type: web
@@ -21,21 +29,9 @@ services:
     autoDeploy: true
     envVars:
       - key: ENVIRONMENT
-        value: prod
-      - key: PORT
-        sync: false                # Render injects the port at runtime
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ai-companion-db
-          property: connectionString
-      - key: SESSION_SECRET
-        sync: false                # >= 32 bytes; set in dashboard
+        value: test                # smoke test first; switch to prod when creds exist
       - key: LLM_MODE
-        value: live
-      - key: LLM_API_KEY
-        sync: false                # provider key; set in dashboard
-      - key: LLM_MODEL
-        sync: false                # pinned model id; reject latest/*
+        value: stub                # no provider calls; flip to live + set keys for prod
       - key: EMBEDDING_MODEL
         value: text-embedding-3-small
       - key: EMBEDDING_DIM
@@ -48,15 +44,6 @@ services:
         value: "6"
       - key: MAX_AI_CALLS_PER_DAY
         value: "50"
-      - key: CORS_ALLOWED_ORIGINS
-        sync: false                # exact https origins; no wildcard
       - key: LOG_LEVEL
         value: info
 
-databases:
-  - name: ai-companion-db
-    plan: free
-    region: singapore
-    postgresMajorVersion: "16"     # pgvector available; enable extension in migration
-    # The runtime role is created by the migration/ops step with read-only grants
-    # on content_chunks (INV-SEC-001); ingest_admin is used only offline.
