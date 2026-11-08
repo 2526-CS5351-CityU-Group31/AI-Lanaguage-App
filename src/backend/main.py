@@ -11,11 +11,36 @@ NO file-upload route: the only accepted content type is ``application/json``.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from src.backend.auth.router import AuthRouter
-from src.backend.auth.security_reference import ReferenceAuthSecurity
+from src.backend.auth.security import AuthSecurity
 from src.backend.db.repositories import InMemoryStores
+
+logger = logging.getLogger(__name__)
+
+
+def build_stores(database_url: str | None):
+    """Build production stores over PostgreSQL, falling back to in-memory.
+
+    Implements: ADR-011 (Render managed Postgres); ADR-009; INV-SEC-001
+    The DSN must be the ``app_runtime`` role so corpus writes are denied. If a
+    pool cannot be opened (driver missing or DB unreachable), the app degrades
+    to in-memory stores and logs a warning rather than crashing at import time
+    (RP-011 readiness still reports the DB state via /ready).
+    """
+    if not database_url:
+        return InMemoryStores()
+    try:
+        from src.backend.db.repositories import PostgresStores, make_pool
+
+        pool = make_pool(database_url)
+        logger.info("database pool opened (PostgreSQL stores active)")
+        return PostgresStores(pool)
+    except Exception as exc:  # pragma: no cover - environment dependent
+        logger.warning("database unavailable, using in-memory stores: %s", exc)
+        return InMemoryStores()
 
 
 @dataclass(frozen=True)
@@ -37,13 +62,13 @@ class AppEntry:
     Implements: ADR-001; INV-SEC-002; ADR-011
     """
 
-    stores: InMemoryStores = field(default_factory=InMemoryStores)
+    stores: object = field(default_factory=InMemoryStores)
     security: object = None  # type: ignore[assignment]
     auth: AuthRouter = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         if self.security is None:
-            self.security = ReferenceAuthSecurity(self.stores)
+            self.security = AuthSecurity(self.stores)
         if self.auth is None:
             self.auth = AuthRouter(security=self.security, stores=self.stores)
 
@@ -70,12 +95,23 @@ class AppEntry:
         return any(not route.accepts_json_only for route in self.routes())
 
 
-def create_app(stores: InMemoryStores | None = None) -> AppEntry:
+def create_app(stores: object | None = None) -> AppEntry:
     """Application factory used by the ASGI entrypoint and tests.
 
     Implements: ADR-001; ADR-011
+    When ``stores`` is None the DATABASE_URL from config selects PostgreSQL
+    stores with a graceful in-memory fallback.
     """
-    return AppEntry(stores=stores or InMemoryStores())
+    if stores is not None:
+        return AppEntry(stores=stores)
+    from src.backend.config import load_config
+
+    try:
+        config = load_config()
+        database_url = config.database_url
+    except Exception:  # pragma: no cover - config not exported in some tests
+        database_url = None
+    return AppEntry(stores=build_stores(database_url))
 
 
 def build_fastapi_app() -> object:

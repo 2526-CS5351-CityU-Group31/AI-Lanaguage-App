@@ -13,6 +13,8 @@ multipart or file parameter anywhere in this module (INV-SEC-002).
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Header, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,7 +28,7 @@ from src.backend.auth.router import (
     RegistrationConflict,
 )
 from src.backend.main import create_app as create_entry
-from src.backend.safety_boundary.scope_guard_reference import ReferenceScopeGuard
+from src.backend.safety_boundary.scope_guard import ScopeGuard
 from src.backend.user_progress.service import ProgressService
 from src.backend.vocabulary.service import VocabularyService, VocabularyStateError
 
@@ -56,6 +58,23 @@ def _principal_of(request: Request):
     if principal is None:
         raise AuthenticationError("invalid session")
     return principal
+
+
+def _probe_db(stores: object) -> bool:
+    """Return True when the store backend answers a trivial query.
+
+    Implements: RP-011 (readiness reflects DB availability); ADR-011
+    In-memory stores are always ready; a PostgreSQL pool is probed.
+    """
+    pool = getattr(stores, "_pool", None)
+    if pool is None:
+        return True
+    try:
+        with pool.connection() as conn:
+            conn.execute("SELECT 1").fetchone()
+        return True
+    except Exception:  # pragma: no cover - environment dependent
+        return False
 
 
 
@@ -184,17 +203,40 @@ def _extract_bearer(authorization: str | None) -> str:
 def build_http_app(router: AuthRouter | None = None) -> FastAPI:
     """Build the FastAPI application around an ``AuthRouter``.
 
-    Implements: ADR-001; ADR-011; INV-SEC-002 (no upload routes registered)
+    Implements: ADR-001; ADR-011; INV-SEC-002 (no upload routes registered);
+      RP-011 (readiness reflects DB state); ADR-009
     """
     entry = create_entry()
     auth_router = router or entry.auth
 
-    app = FastAPI(title="AI-Companion Language Learning API", version="1.0.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Open resources on startup and close them on shutdown.
+
+        Implements: ADR-011 (pool lifecycle); INV-PROG-001 (no partial writes);
+          RP-011 (readiness reflects DB availability)
+        """
+        app.state.db_ready = _probe_db(entry.stores)
+        try:
+            yield
+        finally:
+            close = getattr(entry.stores, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:  # pragma: no cover - best-effort shutdown
+                    pass
+
+    app = FastAPI(
+        title="AI-Companion Language Learning API",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
     app.state.auth_router = auth_router
     app.state.stores = entry.stores
     app.state.vocabulary_service = VocabularyService(entry.stores)
     app.state.progress_service = ProgressService(entry.stores)
-    app.state.scope_guard = ReferenceScopeGuard()
+    app.state.scope_guard = ScopeGuard()
     app.state.chat_router = ChatRouter(
         security=entry.security,
         scope_guard=app.state.scope_guard,
@@ -207,12 +249,14 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         return {"status": "ok"}
 
     @app.get("/ready")
-    def ready() -> dict[str, str]:
-        """Readiness probe; the in-memory store is always ready here.
+    def ready(request: Request):
+        """Readiness probe reflecting database availability.
 
-        Implements: RP-011; ADR-011
+        Implements: RP-011 (503 when the store is unavailable); ADR-011
         """
-        return {"status": "ready"}
+        if getattr(request.app.state, "db_ready", True):
+            return {"status": "ready"}
+        return JSONResponse(status_code=503, content={"status": "database_unavailable"})
 
     @app.post("/auth/register", response_model=TokenResponse)
     def register(body: RegisterRequest, request: Request) -> TokenResponse:

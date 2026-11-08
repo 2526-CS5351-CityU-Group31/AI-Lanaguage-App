@@ -98,7 +98,7 @@ Because the Free plan restarts processes, the per-user daily AI call counter is 
 |---|---|---|
 | `Dockerfile` | Pinned Python 3.12-slim image; non-root user; CMD `python -m src.backend.main`; HEALTHCHECK on `/health` | Member 3 (implementer), reviewed by Member 5 |
 | `render.yaml` | Render Blueprint: one free web service + one free Postgres(pgvector); secrets via `sync: false`; `healthCheckPath: /health` | Member 3 (spec), Member 5 (deploy) |
-| `requirements.txt` | Pinned `fastapi`, `uvicorn[standard]` | Member 3 |
+| `requirements.txt` | Pinned `fastapi`, `uvicorn[standard]`, `psycopg[binary,pool]` | Member 3 |
 
 **Deferred to Member 5 (DevOps), not yet created:** `.dockerignore`,
 `.env.example` (explicitly Member 5's file per `role-ownership.md` §1), and the
@@ -122,6 +122,7 @@ decision introduces the HTTP framework and server used by the Render web service
 |---|---|---|---|
 | `fastapi` | 0.162.0 | HTTP boundary for the AppEntry routers; Pydantic request/response models | Imported and exercised in a real ASGI/TestClient run |
 | `uvicorn[standard]` | 0.54.0 | ASGI server bound to the Render `PORT` | Booted and served `/health` on an injected port |
+| `psycopg[binary,pool]` | 3.3.8 | Synchronous PostgreSQL driver + connection pool for the `users`/`sessions`/`user_vocabulary`/`learning_events` repositories (ADR-008, ADR-009, INV-PROG-001). Kept synchronous to match the existing service layer and avoid a destabilising async refactor. | Imported and compiled against the Python runtime; repositories use `dict_row` + `ON CONFLICT` idempotency |
 
 They are declared in `requirements.txt` at the repository root. No other new
 third-party package is introduced by this ADR. The safety boundary
