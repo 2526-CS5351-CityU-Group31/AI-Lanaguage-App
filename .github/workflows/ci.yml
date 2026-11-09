@@ -105,7 +105,7 @@ jobs:
   # Gate 6: AI-use Log Gate. A PR changing code/prompts without updating the log
   # is blocked, and the log itself must be schema-valid with append-only history.
   gate-6-ai-use-log:
-    name: "Gate 6: AI-use Log"
+    name: "Gate 6: AI-Use Log Gate"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
