@@ -46,6 +46,7 @@ defaults  <  config/{ENVIRONMENT}.yaml  <  environment variables  <  CLI flags (
 | `CORS_ALLOWED_ORIGINS` | `cors_allowed_origins` | comma list | `http://localhost:5173` in dev; none in prod | prod entries must be `https://` and exact; no `*` | yes | no |
 | `LOG_LEVEL` | `log_level` | enum `debug` `info` `warn` `error` | `info` | prod may not be `debug` | yes | no |
 | `FEATURE_AI_PAUSED` | `feature_ai_paused` | bool | `false` | true/false/1/0; when true, AI endpoints return 503 except health | no | no |
+| `PORT` | `port` | int | `8000` | 1..65535; Render injects it; read only by the config module so S5 holds | no | no |
 
 ### Mapping rules
 

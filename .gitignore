@@ -2,12 +2,14 @@
 # Finder metadata
 .DS_Store
 
-# Thumbnails
+# AppleDouble / resource fork files
 ._*
+
+# Thumbnails
+Thumbs.db
 
 # Custom folder icons
 Icon
-
 
 # Volume root files
 .DocumentRevisions-V100
@@ -18,8 +20,32 @@ Icon
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
 
+### Node / frontend
 # Node dependencies
 node_modules/
 
 # Frontend build output
 dist/
+
+### Secrets
+# Never commit real environment files or keys
+.env
+.env.*
+!.env.example
+
+### Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+### Tests / evaluation artifacts
+.deepeval/
+reports/
+coverage.xml
+.coverage
+htmlcov/
