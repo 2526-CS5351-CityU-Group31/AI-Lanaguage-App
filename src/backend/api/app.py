@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.backend.api.schemas.profile import ProfileValidationError
 from src.backend.api.routers.chat import ChatRouter
+from src.backend.contracts.models import LearnerMode
 from src.backend.auth.router import (
     AuthenticationError,
     AuthRouter,
@@ -41,10 +42,13 @@ class _NoopPipeline:
     """
 
     def run(self, **kwargs: object) -> dict:
+        task = kwargs.get("task", "conversation")
         return {
-            "turn_id": str(kwargs.get("request_id", "turn")),
-            "response": {"task": "conversation", "abstained": False, "source_ids": []},
+            "task": task,
+            "abstained": False,
             "source_ids": [],
+            "answer": "Hello! How can I help you practise English?",
+            "validation_id": "val_" + str(kwargs.get("request_id", "turn")),
         }
 
 
@@ -128,15 +132,18 @@ class FamiliarityRequest(BaseModel):
 
 
 class MessageRequest(BaseModel):
-    """A chat turn body.
+    """A chat turn body (frontend contract).
 
-    Implements: FR-CHAT-001
+    Implements: FR-CHAT-001; INV-SCOPE-001 (learner_mode selects task but never
+    bypasses scope control)
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    learner_mode: LearnerMode = LearnerMode.TEXT
     message: str = Field(min_length=0, max_length=1500)
     request_id: str = Field(min_length=1, max_length=128)
+    topic: str | None = Field(default=None, max_length=200)
 
 
 class VocabularyCardResponse(BaseModel):
@@ -393,6 +400,23 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
             recent_topics=metrics.recent_topics,
         )
 
+    @app.post("/sessions")
+    def create_session(request: Request):
+        """Create a server-generated chat session owned by the caller.
+
+        Implements: FR-CHAT-001; ADR-009 (session belongs to the authenticated
+        user; the client never supplies a user_id or a session_id)
+        """
+        import uuid
+
+        try:
+            principal = _principal_of(request)
+        except AuthenticationError as exc:
+            return JSONResponse(status_code=exc.status_code, content={"error": exc.reason})
+        session_id = "sess_" + uuid.uuid4().hex
+        request.app.state.stores.chat_sessions.create(session_id, principal.user_id)
+        return {"session_id": session_id}
+
     @app.post("/sessions/{session_id}/messages")
     def post_message(
         session_id: str,
@@ -401,11 +425,19 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
     ):
         """Scope-guard the message, then (only if accepted) run the pipeline.
 
-        Implements: INV-SCOPE-001, INV-SCOPE-003; FR-CHAT-001
+        Implements: INV-SCOPE-001, INV-SCOPE-003; FR-CHAT-001; ADR-009
+        Returns a FLAT frontend-compatible response (task/abstained/source_ids/
+        answer/validation_id, plus scope_status/scope_message on rejection).
         """
+        try:
+            principal = _principal_of(request)
+        except AuthenticationError as exc:
+            return JSONResponse(status_code=exc.status_code, content={"error": exc.reason})
+        # ADR-009: a chat session belongs to its owner; reject foreign sessions.
+        owner = request.app.state.stores.chat_sessions.owner_of(session_id)
+        if owner is not None and owner != principal.user_id:
+            return JSONResponse(status_code=404, content={})
         authorization = request.headers.get("authorization")
-        if not authorization or not authorization.lower().startswith("bearer "):
-            return JSONResponse(status_code=401, content={"error": "missing session"})
         token = authorization.split(" ", 1)[1].strip()
         try:
             result = request.app.state.chat_router.handle_message(
@@ -413,16 +445,11 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
                 session_id=session_id,
                 message=body.message,
                 request_id=body.request_id,
+                learner_mode=body.learner_mode.value,
+                topic=body.topic,
             )
         except AuthenticationError as exc:
             return JSONResponse(status_code=exc.status_code, content={"error": exc.reason})
-        if isinstance(result, dict):
-            return JSONResponse(status_code=200, content=result)
-        return {
-            "session_id": result.session_id,
-            "turn_id": result.turn_id,
-            "response": result.response,
-            "source_ids": list(result.source_ids),
-        }
+        return JSONResponse(status_code=200, content=result)
 
     return app

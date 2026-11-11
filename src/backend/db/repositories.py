@@ -151,6 +151,23 @@ class InMemoryEventStore:
         return [dict(row) for row in self._rows if row["user_id"] == user_id]
 
 
+class InMemoryChatSessionStore:
+    """Server-generated chat session id -> owner user_id (owner-scoped).
+
+    Implements: FR-CHAT-001; ADR-009 (a session belongs to its owner); the id
+    is always server-generated, never client-supplied.
+    """
+
+    def __init__(self) -> None:
+        self._owner: dict[str, str] = {}
+
+    def create(self, session_id: str, user_id: str) -> None:
+        self._owner[session_id] = user_id
+
+    def owner_of(self, session_id: str) -> str | None:
+        return self._owner.get(session_id)
+
+
 class InMemoryStores:
     """Container wiring the in-memory repositories for tests/dev.
 
@@ -162,6 +179,7 @@ class InMemoryStores:
         self.sessions = InMemorySessionRepository()
         self.vocabulary = InMemoryVocabularyStore()
         self.events = InMemoryEventStore()
+        self.chat_sessions = InMemoryChatSessionStore()
         self.loader = None  # set by the composition root when a dataset is available
 
 
@@ -394,6 +412,9 @@ class PostgresStores:
         self.sessions = PostgresSessionRepository(pool)
         self.vocabulary = PostgresVocabularyStore(pool)
         self.events = PostgresEventStore(pool)
+        # Chat-session ids are ephemeral per process for R1; a dedicated table
+        # can replace this in a later migration without changing the API.
+        self.chat_sessions = InMemoryChatSessionStore()
         self.loader = None
         self._pool = pool
 

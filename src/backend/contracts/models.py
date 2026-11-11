@@ -92,3 +92,29 @@ class RegistrationResult:
 
     session_token: str
     profile: Profile = field(repr=False)
+
+
+class LearnerMode(str, Enum):
+    """Frontend learner-mode selector for a chat turn.
+
+    Implements: FR-CHAT-001; INV-SCOPE-001 (mode selects tutor task, never
+      bypasses scope control)
+    """
+
+    TEXT = "text"
+    CONVERSATION_PRACTICE = "conversation_practice"
+    WRITING_FEEDBACK = "writing_feedback"
+    GRAMMAR_QUESTION = "grammar_question"
+    VOCABULARY_QUESTION = "vocabulary_question"
+    LESSON_QUESTION = "lesson_question"
+
+
+# Frontend learner_mode -> backend tutor task mapping (ADR-005 contracts).
+LEARNER_MODE_TO_TASK: Final[dict[str, str]] = {
+    LearnerMode.TEXT.value: "conversation",
+    LearnerMode.CONVERSATION_PRACTICE.value: "conversation",
+    LearnerMode.WRITING_FEEDBACK.value: "writing_feedback",
+    LearnerMode.GRAMMAR_QUESTION.value: "lesson_help",
+    LearnerMode.VOCABULARY_QUESTION.value: "lesson_help",
+    LearnerMode.LESSON_QUESTION.value: "lesson_help",
+}
