@@ -155,7 +155,7 @@ Deterministic intent classifier; runs **before** any retrieval/model call.
    - Gate 2 (Static Analysis) currently runs a placeholder — wire `mypy --strict src` and
      `pytest test/offline -q`.
    - Gate 5 (Regression) currently echoes — run `pytest test/offline -q`.
-   - Gate 6 (AI-Use Log) is implemented; confirm SES-023 is present in
+   - Gate 6 (AI-Use Log) is implemented; confirm SES-026 is present in
      `docs/code-governance/ai-use-log.yaml` (it validates against the schema).
 3. **Negative boundary probes to include:**
    - Foreign `user_id` / session id → **404 with empty body, zero state mutation**
