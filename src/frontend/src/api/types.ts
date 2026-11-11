@@ -16,9 +16,14 @@ export type CefrLevel = (typeof CEFR_LEVELS)[number];
 /** INV-LANG-001: English only; no language selector in the UI. */
 export type Language = "en";
 
+/** Session token returned by the deployed backend on login/register. */
+export interface TokenResponse {
+  session_token: string;
+}
+
 /** FR-AUTH-001 / INV-AUTH-001: identity is server-derived, never client-set. */
 export interface MeResponse {
-  id: string;
+  user_id: string;
   email: string;
   language: Language;
   cefr_level: CefrLevel;
@@ -28,6 +33,7 @@ export interface MeResponse {
 export interface RegisterRequest {
   email: string;
   password: string;
+  cefr_level: CefrLevel;
   language: Language;
 }
 

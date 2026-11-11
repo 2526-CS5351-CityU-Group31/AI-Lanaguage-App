@@ -80,6 +80,28 @@ describe("FR-DASH-001 dashboard metrics", () => {
       expect(screen.queryByTestId("metric-sessions")).not.toBeInTheDocument(),
     );
   });
+
+  it("FR-DASH-001, VS-16: quick-action icons preserve accessible names and routes", async () => {
+    renderProgress();
+    await screen.findByTestId("metric-sessions");
+
+    const expectedActions = [
+      { name: /conversation practice/i, path: "/chat" },
+      { name: /writing feedback/i, path: "/chat" },
+      { name: /grammar practice/i, path: "/chat" },
+      { name: /vocabulary review/i, path: "/vocabulary" },
+      { name: /^profile/i, path: "/profile" },
+    ];
+
+    for (const action of expectedActions) {
+      const link = screen.getByRole("link", { name: action.name });
+      expect(link).toHaveAttribute("href", action.path);
+      const icon = link.querySelector("svg");
+      expect(icon).not.toBeNull();
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+      expect(icon).toHaveAttribute("focusable", "false");
+    }
+  });
 });
 
 describe("VS-16 accessibility", () => {

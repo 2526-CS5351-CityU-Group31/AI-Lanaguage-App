@@ -14,6 +14,7 @@ import LevelSelector from "../components/LevelSelector";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import type { CefrLevel, MeResponse, UpdateProfileRequest } from "../api/types";
+import AppIcon from "../components/AppIcon";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<MeResponse | null>(null);
@@ -75,35 +76,68 @@ export default function ProfilePage() {
 
   return (
     <main className="page profile-page">
-      <h1>Profile</h1>
-      {profile ? <p className="profile-email">{profile.email}</p> : null}
+      <header className="page-header">
+        <h1>Profile</h1>
+        <p>Manage your learning level and the goals that guide your English practice.</p>
+      </header>
 
-      {saveMessage ? (
-        <p role="alert" className="form-message">
-          {saveMessage}
-        </p>
+      {profile ? (
+        <section className="profile-summary card" aria-label="Profile summary">
+          <span className="profile-avatar"><AppIcon name="profile" /></span>
+          <div className="profile-identity">
+            <p className="profile-kicker">English learner</p>
+            <p className="profile-email">{profile.email}</p>
+          </div>
+          <span className="level-badge" aria-label={`Current CEFR level ${profile.cefr_level}`}>
+            {profile.cefr_level}
+          </span>
+        </section>
       ) : null}
 
-      <LevelSelector value={level} onChange={setLevel} />
-      {fieldErrors.cefr_level ? (
-        <p role="alert" className="field-error">
-          {fieldErrors.cefr_level}
-        </p>
-      ) : null}
+      <section className="profile-form-card card" aria-labelledby="learning-settings-title">
+        <div className="section-heading">
+          <span className="section-icon"><AppIcon name="target" /></span>
+          <div>
+            <h2 id="learning-settings-title">Learning settings</h2>
+            <p>Keep these details current so practice stays appropriate for your level.</p>
+          </div>
+        </div>
 
-      <label htmlFor="goals" className="field">
-        <span>Learning goals</span>
-        <textarea
-          id="goals"
-          value={goals}
-          onChange={(e) => setGoals(e.target.value)}
-          rows={3}
-        />
-      </label>
+        {saveMessage ? (
+          <p role="alert" className="form-message">
+            {saveMessage}
+          </p>
+        ) : null}
 
-      <button type="button" onClick={handleSave} disabled={saving}>
-        {saving ? "Saving…" : "Save"}
-      </button>
+        <div className="profile-fields">
+          <div>
+            <LevelSelector value={level} onChange={setLevel} />
+            <p className="field-help">Choose from the supported A1–B2 learning levels.</p>
+            {fieldErrors.cefr_level ? (
+              <p role="alert" className="field-error">
+                {fieldErrors.cefr_level}
+              </p>
+            ) : null}
+          </div>
+
+          <label htmlFor="goals" className="field goals-field">
+            <span>Learning goals</span>
+            <textarea
+              id="goals"
+              value={goals}
+              onChange={(e) => setGoals(e.target.value)}
+              rows={5}
+              placeholder="For example: improve business writing or speak more confidently while travelling."
+            />
+            <span className="field-help">Describe what you would most like to improve.</span>
+          </label>
+        </div>
+
+        <button className="save-profile-button" type="button" onClick={handleSave} disabled={saving}>
+          <AppIcon name="check" />
+          <span>{saving ? "Saving…" : "Save changes"}</span>
+        </button>
+      </section>
     </main>
   );
 }

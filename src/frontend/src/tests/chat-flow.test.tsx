@@ -76,6 +76,44 @@ describe("learner mode selection maps to the correct tutor path", () => {
     await waitFor(() => expect(received?.learner_mode).toBe("conversation_practice"));
     expect(await screen.findByText("Hello!")).toBeInTheDocument();
   });
+
+  it("FR-CHAT-001, VS-16: learner modes render as accessible icon cards", () => {
+    renderChat();
+    for (const mode of [
+      /conversation practice/i,
+      /writing feedback/i,
+      /grammar question/i,
+      /vocabulary question/i,
+      /lesson question/i,
+    ]) {
+      const radio = screen.getByRole("radio", { name: mode });
+      const card = radio.closest("label");
+      expect(card).toHaveClass("mode-card");
+      const icon = card?.querySelector("svg");
+      expect(icon).not.toBeNull();
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+      expect(icon).toHaveAttribute("focusable", "false");
+    }
+  });
+
+  it("FR-CHAT-001: a starter suggestion fills the composer without sending a request", async () => {
+    let messageRequests = 0;
+    server.use(
+      http.post("/api/sessions/:id/messages", () => {
+        messageRequests += 1;
+        return HttpResponse.json(
+          { task: "conversation", abstained: false, source_ids: [], answer: "Hello!", validation_id: "v1" },
+          { status: 200 },
+        );
+      }),
+    );
+    renderChat();
+
+    fireEvent.click(screen.getByRole("button", { name: /help me introduce myself/i }));
+
+    expect(screen.getByLabelText(/message/i)).toHaveValue("Help me introduce myself.");
+    expect(messageRequests).toBe(0);
+  });
 });
 
 describe("INV-SCOPE-002/004/005 scope status rendered verbatim and separate", () => {
@@ -126,7 +164,7 @@ describe("INV-CITE-001 citations", () => {
     fireEvent.click(screen.getByRole("radio", { name: /grammar question/i }));
     fireEvent.change(screen.getByLabelText(/message/i), { target: { value: "when do I use present perfect" } });
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
-    expect(await screen.findByText(/present perfect/i)).toBeInTheDocument();
+    expect(await screen.findByText("Use the present perfect for experiences.")).toBeInTheDocument();
     expect(screen.getByText(/form/i)).toBeInTheDocument();
   });
 
@@ -243,6 +281,14 @@ describe("VS-16 accessibility", () => {
     fireEvent.change(screen.getByLabelText(/message/i), { target: { value: original } });
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
     await screen.findByText(/she goes to school every day/i);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("VS-16: redesigned empty practice workspace has zero critical axe violations", async () => {
+    const { container } = renderChat();
+    await screen.findByRole("region", { name: /conversation/i });
+    await screen.findByRole("group", { name: /conversation starters/i });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });

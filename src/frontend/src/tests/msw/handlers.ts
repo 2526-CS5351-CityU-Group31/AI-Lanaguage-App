@@ -44,14 +44,29 @@ const vocabularyCard = {
 
 export const handlers = [
   http.post(`${api}/auth/register`, async ({ request }) => {
-    const body = (await request.json()) as { email?: string; language?: string };
+    const body = (await request.json()) as {
+      email?: string;
+      password?: string;
+      cefr_level?: string;
+      language?: string;
+    };
     if (body.language && body.language !== "en") {
       return HttpResponse.json(
         { error_code: "invalid_language", message: "Only English is supported." },
         { status: 422 },
       );
     }
-    return HttpResponse.json({ ok: true }, { status: 200 });
+    if (!body.email || !body.password || !body.cefr_level) {
+      return HttpResponse.json(
+        {
+          error_code: "validation_error",
+          message: "email, password and cefr_level are required.",
+          field_errors: { cefr_level: "Required" },
+        },
+        { status: 422 },
+      );
+    }
+    return HttpResponse.json({ session_token: "test_session_token" }, { status: 200 });
   }),
 
   http.post(`${api}/auth/login`, async ({ request }) => {
@@ -66,7 +81,7 @@ export const handlers = [
         { status: 422 },
       );
     }
-    return HttpResponse.json({ ok: true }, { status: 200 });
+    return HttpResponse.json({ session_token: "test_session_token" }, { status: 200 });
   }),
 
   http.post(`${api}/auth/logout`, () => HttpResponse.json({ ok: true }, { status: 200 })),

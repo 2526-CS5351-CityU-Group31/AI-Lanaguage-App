@@ -1,14 +1,39 @@
-:root {
-  --fg: #1f2933;
-  --muted: #64748b;
-  --bg: #f8fafc;
-  --panel: #ffffff;
-  --accent: #2563eb;
-  --danger: #b91c1c;
-  --border: #e2e8f0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color: var(--fg);
-  background: var(--bg);
+/**
+ * Global styles - English Companion visual system.
+ *
+ * Element: frontend presentation layer (styling only)
+ * Implements: FR-AUTH-001, FR-DASH-001; INV-PROG-001 (display only); VS-16
+ *
+ * Presentation-only redesign. No layout choice changes routes, data or
+ * behaviour. The authenticated shell uses a sidebar; the unauthenticated auth
+ * screen uses a centered card. All colours are CSS custom properties.
+ */
+
+ :root {
+  /* Confirmed palette */
+  --page-bg: #f2b8b5;
+  --sidebar-bg: #082f1e;
+  --shell-bg: #104b2c;
+  --card-bg: #287447;
+  --card-hover: #318656;
+  --text-primary: #fffaf0;
+  --text-muted: #91c59c;
+  --border-dark: #062719;
+  --accent-yellow: #f2aa1b;
+  --accent-red: #e7382d;
+  --accent-blue: #3f8fd6;
+  --accent-pink: #d98691;
+
+  --radius-shell: 28px;
+  --radius-card: 16px;
+  --shadow-shell: 0 24px 60px rgba(6, 39, 25, 0.28);
+  --sidebar-width: 240px;
+  --font-display: Georgia, "Times New Roman", Times, serif;
+  --font-body: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background: var(--page-bg);
 }
 
 * {
@@ -17,23 +42,186 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  background: var(--page-bg);
+  color: var(--text-primary);
   line-height: 1.5;
 }
 
+/* ---------------------------------------------------------------------------
+ * Auth layout (unauthenticated) - centered card, no sidebar.
+ * ------------------------------------------------------------------------- */
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.auth-layout {
+  width: 100%;
+  max-width: 420px;
+  background: var(--shell-bg);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-shell);
+  box-shadow: var(--shadow-shell);
+  padding: 2rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Authenticated dashboard shell - centered container with sidebar.
+ * ------------------------------------------------------------------------- */
+.app-shell {
+  max-width: 1200px;
+  margin: 2.5rem auto;
+  background: var(--shell-bg);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-shell);
+  box-shadow: var(--shadow-shell);
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  overflow: hidden;
+  min-height: calc(100vh - 5rem);
+}
+
+.app-main {
+  padding: 2rem;
+  min-width: 0;
+  background: var(--shell-bg);
+}
+
+/* ---------------------------------------------------------------------------
+ * Sidebar navigation.
+ * ------------------------------------------------------------------------- */
+.app-nav {
+  background: var(--sidebar-bg);
+  color: var(--text-primary);
+  padding: 1.75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  border-right: 1px solid var(--border-dark);
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.app-nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.app-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.app-nav a:hover {
+  background: rgba(145, 197, 156, 0.12);
+  color: var(--text-primary);
+}
+
+.app-nav a.active {
+  background: rgba(40, 116, 71, 0.48);
+  border-color: rgba(145, 197, 156, 0.28);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.app-nav .nav-logout {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 999px;
+  text-align: left;
+}
+
+.app-nav .nav-logout:hover {
+  background: rgba(145, 197, 156, 0.12);
+  color: var(--text-primary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Shared elements.
+ * ------------------------------------------------------------------------- */
 .page {
-  max-width: 760px;
+  max-width: 820px;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: 0 0 1rem;
+}
+
+.page > h1,
+.page > .page-subtitle {
+  margin-top: 0;
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.45rem;
+}
+
+.page-header p {
+  max-width: 650px;
+  margin: 0;
+  color: var(--text-muted);
 }
 
 h1 {
-  font-size: 1.5rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 3vw, 2.55rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+h2,
+h3 {
+  color: var(--text-primary);
+}
+
+h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.app-icon {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.35rem;
   margin-bottom: 1rem;
 }
 
@@ -47,19 +235,26 @@ button {
 input,
 textarea,
 select {
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border-dark);
+  border-radius: 10px;
+  background: var(--text-primary);
+  color: #0b2a1b;
 }
 
+/* Primary buttons use the accent yellow with dark text for contrast. */
 button {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: #fff;
-  border-radius: 6px;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--accent-yellow);
+  background: var(--accent-yellow);
+  color: #0b2a1b;
+  border-radius: 10px;
+  font-weight: 700;
   cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.05);
 }
 
 button:disabled {
@@ -70,108 +265,711 @@ button:disabled {
 .link-button {
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--accent-yellow);
   padding: 0;
   margin-top: 1rem;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .field-error,
 .form-error,
 .form-message {
-  color: var(--danger);
+  color: var(--accent-red);
 }
 
+/* Visible focus for keyboard users on both light and dark surfaces. */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--accent-yellow);
   outline-offset: 2px;
 }
 
-.app-nav ul {
-  display: flex;
-  gap: 1rem;
-  list-style: none;
-  padding: 0.75rem 1rem;
-  margin: 0;
-  border-bottom: 1px solid var(--border);
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.app-nav a.active {
-  font-weight: 700;
-}
-
-.mode-selector {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-}
-
-.radio {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-right: 1rem;
-}
-
+/* ---------------------------------------------------------------------------
+ * Cards.
+ * ------------------------------------------------------------------------- */
 .state,
 .chat-message,
 .vocab-card,
 .metric-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-card);
+  padding: 1.15rem 1.25rem;
   margin-bottom: 1rem;
 }
 
-.scope-status {
-  border-left: 3px solid var(--accent);
-  padding-left: 0.75rem;
-  margin-bottom: 0.75rem;
-  color: var(--muted);
+.card {
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-card);
+  padding: 1.15rem 1.25rem;
 }
 
-.citations {
-  padding-left: 1.25rem;
+.card-link {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-card);
+  padding: 1.15rem 1.25rem;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.card-link:hover,
+.card-link:focus-visible {
+  background: var(--card-hover);
+}
+
+.card-link h3 {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.card-link p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Dashboard (Progress page).
+ * ------------------------------------------------------------------------- */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+}
+
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: var(--accent-yellow);
+  color: #0b2a1b;
+  font-weight: 800;
+  font-size: 0.9rem;
 }
 
 .metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1rem;
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.75rem;
 }
 
 .metric-card dt {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.metric-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 1rem;
+  row-gap: 0.1rem;
+  min-height: 118px;
+}
+
+.metric-card > .app-icon {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0.55rem;
+  color: var(--border-dark);
+  background: var(--accent-yellow);
+  border-radius: 50%;
+}
+
+.metric-card dt,
+.metric-card dd {
+  grid-column: 2;
 }
 
 .metric-card dd {
   font-size: 2rem;
-  font-weight: 700;
+  font-weight: 800;
+  margin: 0.25rem 0 0;
+  color: var(--text-primary);
+}
+
+.quick-actions {
+  list-style: none;
+  padding: 0;
   margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.action-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 3rem;
+  color: var(--border-dark);
+  background: var(--accent-yellow);
+  border: 1px solid var(--border-dark);
+  border-radius: 50%;
+}
+
+.quick-actions li:nth-child(2) .action-icon {
+  background: var(--accent-pink);
+}
+
+.quick-actions li:nth-child(3) .action-icon {
+  background: var(--accent-blue);
+}
+
+.quick-actions li:nth-child(4) .action-icon {
+  background: var(--accent-red);
+}
+
+.quick-actions li:nth-child(5) .action-icon {
+  background: var(--text-muted);
+}
+
+.action-copy {
+  min-width: 0;
+}
+
+.dashboard-section {
+  margin-bottom: 1.75rem;
+}
+
+.dashboard-section > h2 {
+  margin-top: 0;
+  font-size: 1.15rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Chat / scope / citations.
+ * ------------------------------------------------------------------------- */
+.mode-selector {
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-card);
+  padding: 1rem;
+  margin: 0 0 1.25rem;
+  background: rgba(40, 116, 71, 0.34);
+}
+
+.mode-selector legend {
+  padding: 0 0.35rem;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.mode-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 92px;
+  padding: 0.85rem;
+  border: 1px solid rgba(145, 197, 156, 0.3);
+  border-radius: 14px;
+  background: rgba(8, 47, 30, 0.26);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.mode-card:hover {
+  background: rgba(49, 134, 86, 0.52);
+  transform: translateY(-1px);
+}
+
+.mode-card:has(.mode-radio:checked) {
+  border-color: var(--accent-yellow);
+  background: rgba(242, 170, 27, 0.12);
+  box-shadow: inset 0 0 0 1px var(--accent-yellow);
+}
+
+.mode-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.mode-card:has(.mode-radio:focus-visible) {
+  outline: 3px solid var(--accent-yellow);
+  outline-offset: 2px;
+}
+
+.mode-icon,
+.empty-icon,
+.profile-avatar,
+.section-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.mode-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  background: var(--accent-yellow);
+  color: var(--border-dark);
+}
+
+.mode-card:nth-child(2) .mode-icon {
+  background: var(--accent-pink);
+}
+
+.mode-card:nth-child(3) .mode-icon {
+  background: var(--accent-blue);
+}
+
+.mode-card:nth-child(4) .mode-icon {
+  background: var(--accent-red);
+}
+
+.mode-card:nth-child(5) .mode-icon {
+  background: var(--text-muted);
+}
+
+.mode-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mode-label {
+  color: var(--text-primary);
+  font-weight: 750;
+}
+
+.mode-description {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.practice-workspace {
+  overflow: hidden;
+  border: 1px solid var(--border-dark);
+  border-radius: 20px;
+  background: rgba(8, 47, 30, 0.28);
+}
+
+.conversation {
+  min-height: 350px;
+  padding: 1.25rem;
+}
+
+.conversation-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 305px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 4rem;
+  height: 4rem;
+  margin-bottom: 1rem;
+  background: var(--accent-yellow);
+  color: var(--border-dark);
+}
+
+.empty-icon .app-icon {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.conversation-empty h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+}
+
+.conversation-empty > p {
+  max-width: 520px;
+  margin: 0 0 1.1rem;
+  color: var(--text-muted);
+}
+
+.starter-list {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+button.starter-chip {
+  padding: 0.5rem 0.8rem;
+  border-color: rgba(145, 197, 156, 0.45);
+  border-radius: 999px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+button.starter-chip:hover {
+  background: var(--card-hover);
+}
+
+.turn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.user-bubble {
+  align-self: flex-end;
+  max-width: 75%;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--accent-yellow);
+  color: var(--border-dark);
+}
+
+.chat-message.tutor-bubble {
+  align-self: flex-start;
+  width: min(78%, 650px);
+  margin: 0;
+  border-radius: 16px 16px 16px 4px;
+}
+
+.message-author {
+  margin: 0 0 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chat-message .answer {
+  margin-top: 0;
+}
+
+.scope-status {
+  border-left: 3px solid var(--accent-blue);
+  padding-left: 0.75rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-muted);
+}
+
+.citations {
+  padding-left: 1.25rem;
+}
+
+.hint {
+  color: var(--text-muted);
 }
 
 .composer {
-  margin-top: 1rem;
+  margin: 0;
+  padding: 1rem;
+  border-top: 1px solid rgba(145, 197, 156, 0.25);
+  background: var(--sidebar-bg);
 }
 
+.composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.65rem;
+}
+
+.composer-hint {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.send-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.send-button .app-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Profile.
+ * ------------------------------------------------------------------------- */
+.profile-page {
+  max-width: 820px;
+}
+
+.profile-summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.profile-avatar {
+  width: 4rem;
+  height: 4rem;
+  background: var(--accent-pink);
+  color: var(--border-dark);
+}
+
+.profile-avatar .app-icon {
+  width: 2rem;
+  height: 2rem;
+}
+
+.profile-kicker {
+  margin: 0 0 0.1rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-email {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.profile-form-card {
+  padding: 1.4rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1.2rem;
+  border-bottom: 1px solid rgba(145, 197, 156, 0.25);
+}
+
+.section-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  background: var(--accent-yellow);
+  color: var(--border-dark);
+}
+
+.section-heading h2,
+.section-heading p {
+  margin: 0;
+}
+
+.section-heading h2 {
+  font-size: 1.25rem;
+}
+
+.section-heading p,
+.field-help {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.profile-fields {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.65fr) minmax(280px, 1.35fr);
+  gap: 1.25rem;
+}
+
+.profile-fields .field {
+  margin-bottom: 0;
+}
+
+.profile-fields select,
+.profile-fields textarea {
+  width: 100%;
+}
+
+.field-help {
+  margin: 0.4rem 0 0;
+}
+
+.save-profile-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 1.25rem;
+}
+
+.save-profile-button .app-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Loading spinner.
+ * ------------------------------------------------------------------------- */
 .spinner {
   display: inline-block;
   width: 1rem;
   height: 1rem;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
+  margin-right: 0.5rem;
+  border: 2px solid rgba(6, 39, 25, 0.35);
+  border-top-color: var(--accent-yellow);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  vertical-align: middle;
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Responsive: below ~800px switch to compact top navigation + one column.
+ * ------------------------------------------------------------------------- */
+@media (max-width: 800px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    margin: 0;
+    border-radius: 0;
+    min-height: 100vh;
+  }
+
+  .app-nav {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-right: none;
+    border-bottom: 1px solid var(--border-dark);
+  }
+
+  .brand {
+    flex-basis: 100%;
+    font-size: 1rem;
+  }
+
+  .app-nav ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    flex: 1;
+  }
+
+  .app-nav .nav-logout {
+    margin-top: 0;
+    width: auto;
+  }
+
+  .app-main {
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .metrics,
+  .quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation {
+    min-height: 300px;
+    padding: 0.9rem;
+  }
+
+  .conversation-empty {
+    min-height: 260px;
+  }
+
+  .chat-message.tutor-bubble,
+  .user-bubble {
+    max-width: 92%;
+    width: auto;
+  }
+
+  .composer-footer {
+    align-items: flex-end;
+  }
+
+  .composer-hint {
+    max-width: 65%;
+  }
+
+  .profile-summary {
+    grid-template-columns: auto 1fr;
+  }
+
+  .profile-summary .level-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .profile-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-layout {
+    padding: 1.5rem;
+    border-radius: 20px;
   }
 }

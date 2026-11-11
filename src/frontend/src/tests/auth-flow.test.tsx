@@ -10,7 +10,7 @@
  * Element under test: AuthContext, ProtectedRoute, LoginPage, ProfilePage
  * (production modules are created in Gate 3; imports fail until then by design).
  */
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { axe } from "jest-axe";
 import { setupServer } from "msw/node";
@@ -18,14 +18,21 @@ import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
 
 import { handlers, testMe } from "./msw/handlers";
-import { AuthProvider } from "../auth/AuthContext";
+import { AuthProvider, useAuth } from "../auth/AuthContext";
 import { ProtectedRoute } from "../auth/ProtectedRoute";
+import { getSessionToken, setSessionToken } from "../api/client";
+import App from "../App";
 import LoginPage from "../pages/LoginPage";
 import ProfilePage from "../pages/ProfilePage";
 
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
+beforeEach(() => {
+  setSessionToken(null);
+  localStorage.clear();
+  sessionStorage.clear();
+});
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
@@ -90,6 +97,98 @@ describe("FR-AUTH-001 login and register", () => {
   });
 });
 
+describe("bearer token handling (in-memory only)", () => {
+  it("FR-AUTH-001: no Authorization header before login", async () => {
+    let authHeader: string | null | undefined = "unset";
+    server.use(
+      http.get("/api/me", ({ request }) => {
+        authHeader = request.headers.get("authorization");
+        return HttpResponse.json(testMe, { status: 200 });
+      }),
+    );
+    renderApp(<LoginPage />);
+    await waitFor(() => expect(authHeader).toBeNull());
+    expect(getSessionToken()).toBeNull();
+  });
+
+  it("FR-AUTH-001: registration sends cefr_level A1 and stores the Bearer token", async () => {
+    let registerBody: Record<string, unknown> | null = null;
+    let authAfterLogin: string | null | undefined = "unset";
+    let meCalls = 0;
+    server.use(
+      http.post("/api/auth/register", async ({ request }) => {
+        registerBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ session_token: "test_session_token" }, { status: 200 });
+      }),
+      http.get("/api/me", ({ request }) => {
+        meCalls += 1;
+        authAfterLogin = request.headers.get("authorization");
+        return HttpResponse.json(testMe, { status: 200 });
+      }),
+    );
+    renderApp(<LoginPage />);
+    fireEvent.click(screen.getByRole("button", { name: /need an account\? register/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "new@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "secret123" } });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => expect(registerBody).not.toBeNull());
+    expect(registerBody).toMatchObject({ email: "new@example.com", cefr_level: "A1", language: "en" });
+    await waitFor(() => expect(authAfterLogin).toBe("Bearer test_session_token"));
+    expect(getSessionToken()).toBe("test_session_token");
+    expect(meCalls).toBeGreaterThan(0);
+  });
+
+  it("FR-AUTH-001: login sends the Bearer token to protected GET /me", async () => {
+    let authOnMe: string | null | undefined = "unset";
+    server.use(
+      http.post("/api/auth/login", () => HttpResponse.json({ session_token: "test_session_token" }, { status: 200 })),
+      http.get("/api/me", ({ request }) => {
+        authOnMe = request.headers.get("authorization");
+        return HttpResponse.json(testMe, { status: 200 });
+      }),
+    );
+    renderApp(<LoginPage />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "learner@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "secret123" } });
+    fireEvent.click(screen.getByRole("button", { name: /log in/i }));
+
+    await waitFor(() => expect(authOnMe).toBe("Bearer test_session_token"));
+    expect(getSessionToken()).toBe("test_session_token");
+  });
+
+  it("FR-AUTH-001: logout clears the in-memory token", async () => {
+    setSessionToken("test_session_token");
+    function LogoutHarness() {
+      const { logout } = useAuth();
+      return (
+        <button type="button" onClick={() => void logout()}>
+          Log out now
+        </button>
+      );
+    }
+    renderApp(<LogoutHarness />);
+    fireEvent.click(screen.getByRole("button", { name: /log out now/i }));
+    await waitFor(() => expect(getSessionToken()).toBeNull());
+  });
+
+  it("FR-AUTH-001: no token is written to localStorage or sessionStorage", async () => {
+    server.use(
+      http.post("/api/auth/login", () => HttpResponse.json({ session_token: "test_session_token" }, { status: 200 })),
+    );
+    renderApp(<LoginPage />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "learner@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "secret123" } });
+    fireEvent.click(screen.getByRole("button", { name: /log in/i }));
+    await waitFor(() => expect(getSessionToken()).toBe("test_session_token"));
+
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
+    const dumped = JSON.stringify({ ...localStorage, ...sessionStorage });
+    expect(dumped).not.toContain("test_session_token");
+  });
+});
+
 describe("INV-AUTH-001 protected routes", () => {
   it("INV-AUTH-001: redirects unauthenticated users away from a protected route", async () => {
     server.use(
@@ -109,7 +208,7 @@ describe("INV-AUTH-001 protected routes", () => {
     server.use(
       http.get("/api/me", () =>
         HttpResponse.json(
-          { id: "u1", email: "a@b.com", language: "en", cefr_level: "B1", learning_goals: "" },
+          { user_id: "u1", email: "a@b.com", language: "en", cefr_level: "B1", learning_goals: null },
           { status: 200 },
         ),
       ),
@@ -126,7 +225,7 @@ describe("INV-AUTH-001 protected routes", () => {
 describe("FR-PROF-001 profile update and INV-CEFR-001", () => {
   it("FR-PROF-001: displays the CEFR level fetched from the backend", async () => {
     renderApp(<ProfilePage />);
-    expect(await screen.findByText(/B1/)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Current CEFR level B1")).toBeInTheDocument();
   });
 
   it("INV-CEFR-001: the level selector offers only A1, A2, B1, B2", async () => {
@@ -156,12 +255,84 @@ describe("FR-PROF-001 profile update and INV-CEFR-001", () => {
     fireEvent.click(save);
     expect(await screen.findByText(/invalid cefr level/i)).toBeInTheDocument();
   });
+
+  it("FR-PROF-001: profile summary displays only server-provided account values", async () => {
+    renderApp(<ProfilePage />);
+    const summary = await screen.findByRole("region", { name: /profile summary/i });
+    expect(summary).toHaveTextContent(testMe.email);
+    expect(summary).toHaveTextContent(testMe.cefr_level);
+    expect(summary).toHaveTextContent(/english learner/i);
+  });
+
+  it("FR-PROF-001, VS-16: profile summary icon is decorative", async () => {
+    renderApp(<ProfilePage />);
+    const summary = await screen.findByRole("region", { name: /profile summary/i });
+    const icon = summary.querySelector("svg");
+    expect(icon).not.toBeNull();
+    expect(icon).toHaveAttribute("aria-hidden", "true");
+    expect(icon).toHaveAttribute("focusable", "false");
+  });
 });
 
 describe("VS-16 accessibility", () => {
   it("VS-16: login page has zero critical axe violations", async () => {
     const { container } = await renderAppSettled(<LoginPage />);
     await screen.findByRole("form", { name: /log in/i });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("VS-16: authenticated dashboard shell (with Navigation) has zero critical axe violations", async () => {
+    // Render the real App shell at a protected route so the authenticated
+    // dashboard shell, including Navigation (sidebar), is part of the a11y
+    // surface under test. No production test-only hooks are used.
+    const { container } = render(
+      <MemoryRouter initialEntries={["/progress"]}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    // Wait for the authenticated shell (Navigation landmark) to be present.
+    await screen.findByRole("navigation", { name: /main navigation/i });
+    // Wait for the dashboard content to settle so axe inspects the final tree.
+    await screen.findByRole("heading", { name: /welcome/i });
+
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("VS-16: navigation icons are decorative and preserve accessible link names", async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/progress"]}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const navigation = await screen.findByRole("navigation", { name: /main navigation/i });
+    for (const name of ["Practice", "Vocabulary", "Progress", "Profile"]) {
+      const link = screen.getByRole("link", { name });
+      expect(navigation).toContainElement(link);
+      const icon = link.querySelector("svg");
+      expect(icon).not.toBeNull();
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+      expect(icon).toHaveAttribute("focusable", "false");
+    }
+
+    const logout = screen.getByRole("button", { name: "Log out" });
+    expect(navigation).toContainElement(logout);
+    const logoutIcon = logout.querySelector("svg");
+    expect(logoutIcon).not.toBeNull();
+    expect(logoutIcon).toHaveAttribute("aria-hidden", "true");
+    expect(container).toContainElement(navigation);
+  });
+
+  it("VS-16: redesigned profile page has zero critical axe violations", async () => {
+    const { container } = renderApp(<ProfilePage />);
+    await screen.findByRole("region", { name: /profile summary/i });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });

@@ -32,35 +32,39 @@ export default function ChatMessage({
   const hasScope = Boolean(response.scope_status);
 
   return (
-    <article className="chat-message" aria-label="Tutor response">
-      {hasScope ? (
-        <div role="status" aria-label="Scope status" className="scope-status">
-          <span className="scope-label">Scope:</span> {response.scope_status}
-          {response.scope_message ? <p className="scope-message">{response.scope_message}</p> : null}
-        </div>
-      ) : null}
+    <article className="chat-turn" aria-label="Tutor response">
+      {!isWriting ? <p className="user-bubble"><span className="sr-only">You: </span>{originalText}</p> : null}
+      <div className="chat-message tutor-bubble">
+        <p className="message-author">English Companion</p>
+        {hasScope ? (
+          <div role="status" aria-label="Scope status" className="scope-status">
+            <span className="scope-label">Scope:</span> {response.scope_status}
+            {response.scope_message ? <p className="scope-message">{response.scope_message}</p> : null}
+          </div>
+        ) : null}
 
-      {isWriting ? (
-        <WritingFeedback
-          original={originalText}
-          answer={response.answer}
-          suggestedText={response.suggested_text}
-          explanation={response.explanation}
-          examples={response.examples}
-        />
-      ) : (
-        <>
-          {response.answer ? <p className="answer">{response.answer}</p> : null}
-          {response.follow_up ? <p className="follow-up">{response.follow_up}</p> : null}
-          {response.abstained ? (
-            <p className="abstention">
-              The approved lessons do not have enough evidence to answer that question.
-            </p>
-          ) : response.source_ids ? (
-            <SourceCitation sourceIds={response.source_ids} sources={response.sources} />
-          ) : null}
-        </>
-      )}
+        {isWriting ? (
+          <WritingFeedback
+            original={originalText}
+            answer={response.answer}
+            suggestedText={response.suggested_text}
+            explanation={response.explanation}
+            examples={response.examples}
+          />
+        ) : (
+          <>
+            {response.answer ? <p className="answer">{response.answer}</p> : null}
+            {response.follow_up ? <p className="follow-up">{response.follow_up}</p> : null}
+            {response.abstained ? (
+              <p className="abstention">
+                The approved lessons do not have enough evidence to answer that question.
+              </p>
+            ) : response.source_ids ? (
+              <SourceCitation sourceIds={response.source_ids} sources={response.sources} />
+            ) : null}
+          </>
+        )}
+      </div>
     </article>
   );
 }

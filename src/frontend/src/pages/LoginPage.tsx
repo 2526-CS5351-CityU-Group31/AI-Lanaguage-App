@@ -4,13 +4,13 @@
  * Element: frontend auth page
  * Implements: FR-AUTH-001; INV-LANG-001, INV-AUTH-001; ADR-009
  *
- * No language selector is rendered; the language is fixed to 'en'. Credentials
- * are submitted to the server; the session is an HTTP-only cookie. Field errors
- * from 422 responses are shown inline.
+ * No language selector is rendered; the language is fixed to 'en'. The session
+ * token returned by the backend is stored in memory by AuthContext.
+ * Registration defaults the CEFR level to A1 (no new selector in this task) and
+ * already returns a session token, so login is not called again after register.
  */
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { register, login as loginApi } from "../api/auth";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
@@ -18,7 +18,7 @@ type View = "login" | "register";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { refresh } = useAuth();
+  const { login, register } = useAuth();
   const [view, setView] = useState<View>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,10 +33,10 @@ export default function LoginPage() {
     setFieldErrors({});
     try {
       if (view === "register") {
-        await register({ email, password, language: "en" });
+        await register({ email, password, cefr_level: "A1", language: "en" });
+      } else {
+        await login({ email, password });
       }
-      await loginApi({ email, password });
-      await refresh();
       navigate("/chat");
     } catch (err) {
       if (err instanceof ApiError) {

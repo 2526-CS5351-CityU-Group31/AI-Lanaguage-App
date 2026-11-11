@@ -4,8 +4,11 @@
  * Element: frontend auth context
  * Implements: FR-AUTH-001; INV-AUTH-001; ADR-009
  *
- * Identity is fetched from the server (GET /me) and held only in memory.
- * No tokens or identity are persisted to localStorage/sessionStorage.
+ * The session token is stored in module memory (via setSessionToken) only.
+ * Identity is fetched from GET /me (authenticated by the Bearer token). No
+ * token or identity is persisted to localStorage/sessionStorage. A browser
+ * refresh may clear the session; this is acceptable for the temporary
+ * integration adapter.
  */
 import {
   createContext,
@@ -16,15 +19,21 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getMe, login as loginApi, logout as logoutApi } from "../api/auth";
-import { ApiError } from "../api/client";
-import type { LoginRequest, MeResponse } from "../api/types";
+import {
+  getMe,
+  login as loginApi,
+  logout as logoutApi,
+  register as registerApi,
+} from "../api/auth";
+import { ApiError, setSessionToken } from "../api/client";
+import type { LoginRequest, MeResponse, RegisterRequest } from "../api/types";
 
 interface AuthContextValue {
   user: MeResponse | null;
   loading: boolean;
   error: string | null;
   login: (payload: LoginRequest) => Promise<void>;
+  register: (payload: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -58,22 +67,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const login = useCallback(async (payload: LoginRequest) => {
-    await loginApi(payload);
-    await refresh();
-  }, [refresh]);
+  const login = useCallback(
+    async (payload: LoginRequest) => {
+      try {
+        const { session_token } = await loginApi(payload);
+        setSessionToken(session_token);
+      } catch (err) {
+        setSessionToken(null);
+        throw err;
+      }
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const register = useCallback(
+    async (payload: RegisterRequest) => {
+      try {
+        const { session_token } = await registerApi(payload);
+        setSessionToken(session_token);
+      } catch (err) {
+        setSessionToken(null);
+        throw err;
+      }
+      await refresh();
+    },
+    [refresh],
+  );
 
   const logout = useCallback(async () => {
     try {
       await logoutApi();
+    } catch {
+      // Ignore backend logout errors; the local session is cleared regardless.
     } finally {
+      setSessionToken(null);
       setUser(null);
     }
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, error, login, logout, refresh }),
-    [user, loading, error, login, logout, refresh],
+    () => ({ user, loading, error, login, register, logout, refresh }),
+    [user, loading, error, login, register, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -16,12 +16,29 @@ import type { ChatTurnResponse, LearnerMode } from "../api/types";
 import ModeSelector from "../components/ModeSelector";
 import ChatMessage from "../components/ChatMessage";
 import ErrorState from "../components/ErrorState";
+import AppIcon, { type AppIconName } from "../components/AppIcon";
 
 interface Turn {
   originalText: string;
   learnerMode: LearnerMode;
   response: ChatTurnResponse;
 }
+
+const MODE_EMPTY_STATE: Record<LearnerMode, { title: string; description: string; icon: AppIconName }> = {
+  conversation_practice: { title: "Start a conversation", description: "Choose a starter or write your own message to practise natural English.", icon: "conversation" },
+  writing_feedback: { title: "Improve your writing", description: "Paste a sentence or short paragraph to receive structured feedback.", icon: "writing" },
+  grammar_question: { title: "Ask a grammar question", description: "Describe the rule or sentence that you would like help understanding.", icon: "grammar" },
+  vocabulary_question: { title: "Explore new vocabulary", description: "Ask about a word, phrase, meaning or example sentence.", icon: "vocabulary" },
+  lesson_question: { title: "Review a lesson", description: "Ask a question grounded in the approved English lesson materials.", icon: "lesson" },
+};
+
+const STARTERS: Record<LearnerMode, string[]> = {
+  conversation_practice: ["Help me introduce myself.", "Let's talk about travelling.", "Practise a job interview with me."],
+  writing_feedback: ["Please review this email: ", "Help me improve this paragraph: "],
+  grammar_question: ["When should I use the present perfect?", "Explain articles: a, an and the."],
+  vocabulary_question: ["What does resilient mean?", "Teach me useful words for travelling."],
+  lesson_question: ["Explain the main point of this lesson.", "Can you give me an example from the lesson?"],
+};
 
 export default function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -31,6 +48,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sendingRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function ensureSession(): Promise<string> {
     if (sessionId) return sessionId;
@@ -64,42 +82,71 @@ export default function ChatPage() {
     }
   }
 
+  function chooseStarter(starter: string) {
+    setInput(starter);
+    textareaRef.current?.focus();
+  }
+
+  const emptyState = MODE_EMPTY_STATE[mode];
+
   return (
     <main className="page chat-page">
-      <h1>Practice</h1>
+      <header className="page-header">
+        <h1>Practice</h1>
+        <p>Choose a learning mode and practise English with your AI tutor.</p>
+      </header>
       <ModeSelector value={mode} onChange={setMode} />
 
-      <section className="conversation" aria-label="Conversation">
-        {turns.length === 0 ? (
-          <p className="hint">Choose a mode and start writing in English.</p>
-        ) : (
-          turns.map((turn, i) => (
-            <ChatMessage
-              key={i}
-              originalText={turn.originalText}
-              learnerMode={turn.learnerMode}
-              response={turn.response}
-            />
-          ))
-        )}
-      </section>
+      <div className="practice-workspace">
+        <section className="conversation" aria-label="Conversation" aria-live="polite">
+          {turns.length === 0 ? (
+            <div className="conversation-empty">
+              <span className="empty-icon"><AppIcon name={emptyState.icon} /></span>
+              <h2>{emptyState.title}</h2>
+              <p>{emptyState.description}</p>
+              <div className="starter-list" role="group" aria-label="Conversation starters">
+                {STARTERS[mode].map((starter) => (
+                  <button key={starter} type="button" className="starter-chip" onClick={() => chooseStarter(starter)}>
+                    {starter.trim()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="turn-list">
+              {turns.map((turn, i) => (
+                <ChatMessage
+                  key={i}
+                  originalText={turn.originalText}
+                  learnerMode={turn.learnerMode}
+                  response={turn.response}
+                />
+              ))}
+            </div>
+          )}
+        </section>
 
-      {error ? <ErrorState message={error} /> : null}
+        {error ? <ErrorState message={error} /> : null}
 
-      <form onSubmit={handleSubmit} className="composer" aria-label="Composer">
-        <label htmlFor="message" className="field">
-          <span>Message</span>
+        <form onSubmit={handleSubmit} className="composer" aria-label="Composer">
+          <label htmlFor="message" className="sr-only">Message</label>
           <textarea
+            ref={textareaRef}
             id="message"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            rows={3}
+            rows={2}
+            placeholder="Write your message in English…"
           />
-        </label>
-        <button type="submit" disabled={sending || input.trim().length === 0}>
-          {sending ? "Sending…" : "Send"}
-        </button>
-      </form>
+          <div className="composer-footer">
+            <span className="composer-hint">Your selected practice mode will guide the response.</span>
+            <button className="send-button" type="submit" disabled={sending || input.trim().length === 0}>
+              <span>{sending ? "Sending…" : "Send"}</span>
+              <AppIcon name="send" />
+            </button>
+          </div>
+        </form>
+      </div>
     </main>
   );
 }
