@@ -32,6 +32,7 @@ from backend.contracts.ai_companion import (
     EvidenceSet,
     TaskType,
     ValidatedResponse,
+    ValidationCode,
     ValidationVerdict,
     WritingFeedback,
 )
@@ -58,6 +59,7 @@ TOOL_FIELDS: frozenset[str] = frozenset(
         "role",
         "system",
         "system_prompt",
+        "url",
     )
 )
 
@@ -99,7 +101,7 @@ def _validation_id(task: TaskType, raw_output: str, evidence: EvidenceSet) -> st
 
 def _reject(
     validation_id: str,
-    code: str,
+    code: ValidationCode,
     *,
     path: str = "",
     detail: str = "",
@@ -118,6 +120,31 @@ def _reject(
 def _has_unsafe_markup(text: str) -> bool:
     """ADR-005 §Common envelope: markdown allowlist only; no raw HTML or URLs."""
     return any(pattern.search(text) is not None for pattern in _UNSAFE_MARKUP_PATTERNS)
+
+
+def _mentions_chunk_id(text: str, chunk_id: str) -> bool:
+    """ADR-005: detect a citation token without matching a longer identifier."""
+    if not chunk_id:
+        return False
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9_]){re.escape(chunk_id)}(?![A-Za-z0-9_])"
+    )
+    return pattern.search(text) is not None
+
+
+def _chunk_id_family_pattern(chunk_id: str) -> re.Pattern[str] | None:
+    """ADR-005: match an invented id that shares a known id's numeric shape."""
+    if not chunk_id:
+        return None
+    parts = re.split(r"(\d+)", chunk_id)
+    body = "".join(
+        r"\d+" if part.isdigit() else re.escape(part)
+        for part in parts
+        if part
+    )
+    if not body:
+        return None
+    return re.compile(rf"(?<![A-Za-z0-9_]){body}(?![A-Za-z0-9_])")
 
 
 class CitationValidator:
@@ -208,7 +235,7 @@ class CitationValidator:
                 validation_id,
                 "tool_request",
                 path=tool_keys[0],
-                detail="tool, function and role fields are forbidden",
+                detail="tool, function, role and URL fields are forbidden",
             )
 
         for field in ("task", "abstained", "source_ids", "answer"):
@@ -385,6 +412,47 @@ class CitationValidator:
                 detail="source is not in the retrieved published evidence",
             )
 
+        known_ids = tuple(
+            dict.fromkeys((*evidence.published_ids, *evidence.unpublished_ids))
+        )
+        source_id_set = set(source_ids)
+        for index, tip in enumerate(tips):
+            for chunk_id in known_ids:
+                if chunk_id in source_id_set:
+                    continue
+                if not _mentions_chunk_id(tip, chunk_id):
+                    continue
+                code: ValidationCode = (
+                    "citation_unpublished"
+                    if chunk_id in withheld
+                    else "citation_unknown"
+                )
+                return _reject(
+                    validation_id,
+                    code,
+                    path=f"tips[{index}]",
+                    detail=(
+                        "a citation must be declared in source_ids, "
+                        "not only in tips"
+                    ),
+                )
+            for chunk_id in known_ids:
+                pattern = _chunk_id_family_pattern(chunk_id)
+                if pattern is None:
+                    continue
+                for match in pattern.finditer(tip):
+                    if match.group(0) in source_id_set:
+                        continue
+                    return _reject(
+                        validation_id,
+                        "citation_unknown",
+                        path=f"tips[{index}]",
+                        detail=(
+                            "a citation must be declared in source_ids, "
+                            "not only in tips"
+                        ),
+                    )
+
         if len(set(source_ids)) != len(source_ids):
             return _reject(
                 validation_id,
@@ -538,6 +606,7 @@ class CitationValidator:
             abstained=abstained,
             source_ids=source_ids,
             answer=answer,
+            validation_id=validation_id,
             follow_up=follow_up,
             tips=tips,
             writing_feedback=writing,

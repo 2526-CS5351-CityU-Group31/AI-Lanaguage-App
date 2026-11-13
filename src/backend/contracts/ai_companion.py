@@ -13,6 +13,16 @@ from typing import Literal, Protocol, Sequence
 CefrLevel = Literal["A1", "A2", "B1", "B2"]
 TaskType = Literal["conversation", "lesson_help", "writing_feedback"]
 ReviewStatus = Literal["published", "draft", "retired"]
+ValidationCode = Literal[
+    "accepted",
+    "schema_invalid",
+    "over_length",
+    "unsafe_markup",
+    "citation_unknown",
+    "citation_unpublished",
+    "abstention_inconsistent",
+    "tool_request",
+]
 
 LANGUAGE_ENGLISH = "en"
 CEFR_LEVELS: tuple[CefrLevel, ...] = ("A1", "A2", "B1", "B2")
@@ -113,6 +123,7 @@ class ValidatedResponse:
     abstained: bool
     source_ids: tuple[str, ...]
     answer: str
+    validation_id: str
     follow_up: str | None = None
     tips: tuple[str, ...] = ()
     writing_feedback: WritingFeedback | None = None
@@ -174,7 +185,7 @@ class ValidationVerdict:
     """ADR-005: authoritative validator result consumed by RagPipeline."""
 
     accepted: bool
-    code: str
+    code: ValidationCode
     repairable: bool = False
     error_path: str = ""
     validated_text: str | None = None

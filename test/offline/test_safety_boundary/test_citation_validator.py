@@ -67,6 +67,7 @@ def test_accepts_valid_grounded_response() -> None:
     assert verdict.response is not None
     assert verdict.response.source_ids == ("c1",)
     assert len(verdict.validation_id) == 32
+    assert verdict.response.validation_id == verdict.validation_id
 
 
 def test_reject_invalid_citations() -> None:
@@ -169,6 +170,23 @@ def test_tool_field_rejected_without_repair() -> None:
         assert verdict.error_path == field
 
 
+def test_top_level_url_field_is_hard_security_rejection() -> None:
+    """NFR-SEC-001 / ADR-005: a top-level url field is never repairable."""
+    payload = json.loads(lesson_payload())
+    payload["url"] = "https://example.com/lesson"
+    verdict = CitationValidator().validate(
+        "lesson_help",
+        json.dumps(payload),
+        make_evidence("c1"),
+    )
+
+    assert verdict.accepted is False
+    assert verdict.code == "tool_request"
+    assert verdict.repairable is False
+    assert verdict.error_path == "url"
+    assert verdict.response is None
+
+
 def test_validation_id_is_not_model_controlled() -> None:
     """ADR-005: validation_id is server-assigned, never model-supplied."""
     payload = json.loads(lesson_payload())
@@ -182,6 +200,68 @@ def test_validation_id_is_not_model_controlled() -> None:
     assert verdict.accepted is False
     assert verdict.code == "schema_invalid"
     assert verdict.validation_id != "model-chosen"
+    assert verdict.response is None
+
+
+def test_citation_only_in_tips_is_rejected() -> None:
+    """INV-CITE-001 / ADR-005: a citation must be declared in source_ids."""
+    verdict = CitationValidator().validate(
+        "lesson_help",
+        lesson_payload(source_ids=["c1"], tips=["Also see c2 for more detail."]),
+        make_evidence("c1", "c2"),
+    )
+
+    assert verdict.accepted is False
+    assert verdict.code == "citation_unknown"
+    assert verdict.repairable is False
+    assert verdict.error_path == "tips[0]"
+    assert verdict.response is None
+
+
+def test_invented_citation_only_in_tips_is_rejected() -> None:
+    """INV-CITE-001: an invented citation cannot hide in tips."""
+    verdict = CitationValidator().validate(
+        "lesson_help",
+        lesson_payload(source_ids=["c1"], tips=["Also see c99 for more detail."]),
+        make_evidence("c1"),
+    )
+
+    assert verdict.accepted is False
+    assert verdict.code == "citation_unknown"
+    assert verdict.repairable is False
+    assert verdict.error_path == "tips[0]"
+
+
+def test_unpublished_citation_only_in_tips_is_rejected() -> None:
+    """INV-CITE-001: withheld ids cannot be smuggled through tips."""
+    verdict = CitationValidator().validate(
+        "lesson_help",
+        lesson_payload(source_ids=["c1"], tips=["Retired source retired-1."]),
+        EvidenceSet(
+            chunks=(
+                make_chunk("c1"),
+                make_chunk("retired-1", review_status="retired"),
+            )
+        ),
+    )
+
+    assert verdict.accepted is False
+    assert verdict.code == "citation_unpublished"
+    assert verdict.repairable is False
+    assert verdict.error_path == "tips[0]"
+
+
+def test_declared_citation_repeated_in_tips_is_allowed() -> None:
+    """ADR-005: a citation is rejected only when it appears solely in tips."""
+    verdict = CitationValidator().validate(
+        "lesson_help",
+        lesson_payload(source_ids=["c1"], tips=["Remember c1 for revision."]),
+        make_evidence("c1"),
+    )
+
+    assert verdict.accepted is True
+    assert verdict.response is not None
+    assert verdict.response.source_ids == ("c1",)
 
 
 def test_abstention_inconsistent_citations() -> None:
@@ -259,6 +339,7 @@ def test_duplicate_source_ids_rejected() -> None:
 
     assert verdict.accepted is False
     assert verdict.code == "schema_invalid"
+    assert verdict.repairable is True
     assert verdict.error_path == "source_ids"
 
 
