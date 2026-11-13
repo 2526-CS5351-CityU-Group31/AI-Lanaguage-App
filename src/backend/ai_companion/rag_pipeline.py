@@ -40,6 +40,7 @@ from backend.contracts.ai_companion import (
     TaskType,
     TutorUnavailableError,
     ValidatedResponse,
+    ValidationCode,
     ValidationVerdict,
 )
 
@@ -48,16 +49,19 @@ RagResultStatus = Literal["accepted", "rejected", "abstained"]
 # ADR-005 §Decision: only these failures may consume the single repair attempt.
 # The pipeline keeps its own allowlist so a validator bug cannot turn a citation
 # or authority failure into a retry.
-SAFE_REPAIR_CODES: frozenset[str] = frozenset(
+SAFE_REPAIR_CODES: frozenset[ValidationCode] = frozenset(
     ("schema_invalid", "over_length", "unsafe_markup")
 )
-ABSTENTION_CODES: frozenset[str] = frozenset(
+ABSTENTION_CODES: frozenset[ValidationCode] = frozenset(
     ("citation_unknown", "citation_unpublished", "abstention_inconsistent")
 )
 DEFAULT_REPAIR_TEMPLATE = (
     "Your previous response was rejected with code {code} at {error_path}: "
     "{detail}. Return only a corrected JSON object matching the task schema. "
-    "Do not add, remove or change any source_ids."
+    "Do not add new source_ids or replace any source_id with a different ID. "
+    "If the rejection is at source_ids, remove duplicate or excess entries "
+    "only; otherwise keep source_ids unchanged. Every remaining source_id must "
+    "exactly match a chunk_id in the evidence."
 )
 DEFAULT_PROMPTS_DIR = Path(__file__).resolve().parents[3] / "prompts"
 

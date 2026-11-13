@@ -326,6 +326,100 @@ def test_repairable_failure_gets_exactly_one_repair() -> None:
     assert "chunk_id: c1" in gateway.calls[1].prompt
 
 
+@pytest.mark.parametrize(
+    ("rejected_ids", "repaired_ids"),
+    [
+        (["c1", "c1"], ["c1"]),
+        (
+            ["c1", "c2", "c3", "c4", "c5", "c6"],
+            ["c1", "c2", "c3", "c4", "c5"],
+        ),
+    ],
+)
+def test_real_validator_repairs_source_ids_by_removal(
+    rejected_ids: list[str],
+    repaired_ids: list[str],
+) -> None:
+    """ADR-005: duplicate/over-limit citations are repaired by removal only."""
+    repo_root = Path(__file__).resolve().parents[3]
+    catalog = load_prompt_catalog(repo_root / "prompts" / "prompt_v1.0.0.yaml")
+    evidence_ids = tuple(dict.fromkeys([*rejected_ids, *repaired_ids]))
+    retrieval = FakeRetrievalService(
+        chunks=tuple(make_chunk(chunk_id) for chunk_id in evidence_ids)
+    )
+    rejected = json.dumps(
+        {
+            "task": "lesson_help",
+            "abstained": False,
+            "source_ids": rejected_ids,
+            "answer": "Use the past tense for completed actions.",
+        }
+    )
+    repaired = json.dumps(
+        {
+            "task": "lesson_help",
+            "abstained": False,
+            "source_ids": repaired_ids,
+            "answer": "Use the past tense for completed actions.",
+        }
+    )
+    gateway = FakeModelGateway(
+        responses=[make_response(rejected), make_response(repaired)]
+    )
+    pipeline = RagPipeline(
+        retrieval=RetrievalAdapter(retrieval),
+        assembler=PromptAssembler(),
+        tutor=Tutor(gateway),
+        validator=CitationValidator(),
+        prompt_catalog=catalog,
+    )
+
+    result = pipeline.handle(make_rag_request(top_k=10))
+
+    assert result.status == "accepted"
+    assert result.text == "Use the past tense for completed actions."
+    assert len(gateway.calls) == 2
+    repair_prompt = gateway.calls[1].prompt.lower()
+    assert "[repair_instruction]" in repair_prompt
+    assert "remove" in repair_prompt
+    assert "duplicate" in repair_prompt or "excess" in repair_prompt
+    assert "do not add, remove" not in repair_prompt
+    assert result.response is not None
+    assert result.response.source_ids == tuple(repaired_ids)
+
+
+def test_real_validator_tips_only_citation_abstains_without_repair() -> None:
+    """INV-CITE-001: a citation only in tips fails closed without a repair call."""
+    repo_root = Path(__file__).resolve().parents[3]
+    catalog = load_prompt_catalog(repo_root / "prompts" / "prompt_v1.0.0.yaml")
+    raw = json.dumps(
+        {
+            "task": "lesson_help",
+            "abstained": False,
+            "source_ids": ["c1"],
+            "answer": "Use the past tense for completed actions.",
+            "tips": ["Also see c2 for more detail."],
+        }
+    )
+    retrieval = FakeRetrievalService(chunks=(make_chunk("c1"), make_chunk("c2")))
+    gateway = FakeModelGateway(responses=[make_response(raw)])
+    pipeline = RagPipeline(
+        retrieval=RetrievalAdapter(retrieval),
+        assembler=PromptAssembler(),
+        tutor=Tutor(gateway),
+        validator=CitationValidator(),
+        prompt_catalog=catalog,
+    )
+
+    result = pipeline.handle(make_rag_request())
+
+    assert result.status == "abstained"
+    assert result.text == INSUFFICIENT_EVIDENCE_PHRASE
+    assert len(gateway.calls) == 1
+    assert result.validation is not None
+    assert result.validation.code == "citation_unknown"
+
+
 def test_second_repairable_failure_falls_back_without_third_call() -> None:
     """ADR-005: the repair budget is one call; a second failure is final."""
     retrieval = FakeRetrievalService(chunks=(make_chunk("c1"),))
@@ -473,6 +567,8 @@ def test_real_validator_and_prompt_catalog_integration() -> None:
     assert result.text == answer
     assert result.response is not None
     assert result.response.source_ids == ("c1",)
+    assert result.validation is not None
+    assert result.response.validation_id == result.validation.validation_id
     assert result.prompt_version == "prompt_v1.0.0"
     assert result.evidence_ids == ("c1",)
     assert "POLICY-MARKER" not in gateway.calls[0].prompt

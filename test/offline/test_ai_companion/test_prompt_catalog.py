@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -18,6 +19,47 @@ from backend.contracts.ai_companion import INSUFFICIENT_EVIDENCE_PHRASE
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROMPT_PATH = REPO_ROOT / "prompts" / "prompt_v1.0.0.yaml"
+REQUIRED_TASK_FIELDS = {
+    "conversation": {"task", "abstained", "source_ids", "answer"},
+    "lesson_help": {"task", "abstained", "source_ids", "answer"},
+    "writing_feedback": {
+        "task",
+        "abstained",
+        "source_ids",
+        "answer",
+        "suggested_text",
+        "explanation",
+    },
+}
+ALLOWED_TASK_FIELDS = {
+    "conversation": {
+        "task",
+        "abstained",
+        "source_ids",
+        "answer",
+        "follow_up",
+        "tips",
+    },
+    "lesson_help": {
+        "task",
+        "abstained",
+        "source_ids",
+        "answer",
+        "follow_up",
+        "tips",
+    },
+    "writing_feedback": {
+        "task",
+        "abstained",
+        "source_ids",
+        "answer",
+        "suggested_text",
+        "explanation",
+        "examples",
+        "follow_up",
+        "tips",
+    },
+}
 
 
 def read_prompt_text() -> str:
@@ -52,6 +94,29 @@ def test_loads_versioned_prompt_file() -> None:
     assert "{code}" in catalog.repair_template
     assert "{error_path}" in catalog.repair_template
     assert "{detail}" in catalog.repair_template
+
+
+@pytest.mark.parametrize("task", sorted(REQUIRED_TASK_FIELDS))
+def test_each_task_schema_declares_its_required_fields(task: str) -> None:
+    """ADR-005: every task schema must declare the fields the validator requires."""
+    catalog = load_prompt_catalog(PROMPT_PATH)
+    schema = json.loads(catalog.schema_for(task).text)  # type: ignore[arg-type]
+
+    assert schema["task"] == task
+    assert REQUIRED_TASK_FIELDS[task] <= set(schema)
+    assert set(schema) <= ALLOWED_TASK_FIELDS[task]
+    assert "validation_id" not in schema
+
+
+def test_repair_template_permits_citation_removal_only() -> None:
+    """ADR-005: duplicate/over-limit ids may be removed, never invented."""
+    template = load_prompt_catalog(PROMPT_PATH).repair_template.lower()
+
+    assert "source_ids" in template
+    assert "remove" in template
+    assert "duplicate" in template or "excess" in template
+    assert "replace" in template or "invent" in template
+    assert "do not add, remove" not in template
 
 
 def test_real_catalog_assembles_within_layer_caps() -> None:
