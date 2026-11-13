@@ -131,6 +131,16 @@ def test_usage_and_model_metadata_recorded() -> None:
     assert result.attempts == 1
 
 
+def test_temperature_propagates_to_gateway() -> None:
+    """ADR-005: repair calls run at temperature 0."""
+    gateway = FakeModelGateway(responses=[make_response("ok")])
+    tutor = Tutor(gateway)
+
+    tutor.generate(make_tutor_request(temperature=0.0))
+
+    assert gateway.calls[0].temperature == 0.0
+
+
 def test_invalid_tutor_request_rejected() -> None:
     """ADR-005: invalid Tutor input never reaches the gateway."""
     gateway = FakeModelGateway(responses=[make_response()])
@@ -142,12 +152,29 @@ def test_invalid_tutor_request_rejected() -> None:
     assert gateway.calls == []
 
 
+def test_invalid_temperature_rejected() -> None:
+    """ADR-005: an out-of-range temperature never reaches the gateway."""
+    gateway = FakeModelGateway(responses=[make_response()])
+    tutor = Tutor(gateway)
+
+    with pytest.raises(InvalidRequestError):
+        tutor.generate(make_tutor_request(temperature=1.5))
+
+    assert gateway.calls == []
+
+
 def test_guided_conversation_flow() -> None:
     """FR-CHAT-001 (partial): a conversation turn runs without retrieval."""
     retrieval = FakeRetrievalService()
     gateway = FakeModelGateway(responses=[make_response("Hello learner")])
     validator = FakeResponseValidator(
-        verdicts=[ValidationVerdict(accepted=True, code="accepted")]
+        verdicts=[
+            ValidationVerdict(
+                accepted=True,
+                code="accepted",
+                validated_text="Hello learner",
+            )
+        ]
     )
     pipeline = RagPipeline(
         retrieval=RetrievalAdapter(retrieval),
