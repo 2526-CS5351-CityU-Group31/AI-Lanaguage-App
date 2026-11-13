@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Literal, Protocol, Sequence
 
 CefrLevel = Literal["A1", "A2", "B1", "B2"]
-TaskType = Literal["conversation", "lesson_help"]
+TaskType = Literal["conversation", "lesson_help", "writing_feedback"]
 ReviewStatus = Literal["published", "draft", "retired"]
 
 LANGUAGE_ENGLISH = "en"
@@ -19,6 +19,27 @@ CEFR_LEVELS: tuple[CefrLevel, ...] = ("A1", "A2", "B1", "B2")
 DEFAULT_TOP_K = 5
 MAX_TOP_K = 10
 DEFAULT_MIN_SCORE = 0.35
+
+# ADR-005 response-contract caps. These are shared by the prompt catalogue and
+# the authoritative validator so the model instruction and the gate cannot drift.
+MAX_SOURCE_IDS = 5
+MAX_ANSWER_CHARS = 1200
+MAX_FOLLOW_UP_CHARS = 300
+MAX_TIPS = 2
+MAX_TIP_CHARS = 200
+MAX_SUGGESTED_TEXT_CHARS = 1500
+MAX_EXPLANATION_CHARS = 800
+MAX_EXAMPLES = 2
+MAX_EXAMPLE_CHARS = 300
+MAX_RAW_OUTPUT_CHARS = 12000
+
+# ADR-005 / INV-CITE-001: deterministic learner-visible fallback strings.
+INSUFFICIENT_EVIDENCE_PHRASE = (
+    "I don't have enough published lesson evidence to answer that."
+)
+SAFE_FALLBACK_MESSAGE = (
+    "I couldn't produce a verified answer just now. Please try again."
+)
 
 
 @dataclass(frozen=True)
@@ -39,18 +60,62 @@ class RetrievedChunk:
 
 @dataclass(frozen=True)
 class EvidenceSet:
-    """ADR-007 / INV-CITE-001: the adapter-approved, published evidence set."""
+    """ADR-007 / INV-CITE-001: the adapter-approved, published evidence set.
+
+    ``withheld_ids`` carries only identifiers of candidates the adapter refused
+    to serve because they were not published. No withheld text enters a prompt.
+    """
 
     chunks: tuple[RetrievedChunk, ...] = ()
+    withheld_ids: tuple[str, ...] = ()
 
     @property
     def published_ids(self) -> tuple[str, ...]:
         """INV-CITE-001: IDs available for authoritative citation validation."""
-        return tuple(chunk.chunk_id for chunk in self.chunks)
+        return tuple(
+            chunk.chunk_id
+            for chunk in self.chunks
+            if chunk.review_status == "published"
+        )
+
+    @property
+    def unpublished_ids(self) -> tuple[str, ...]:
+        """INV-CITE-001: known IDs that exist but must never be cited."""
+        candidates = [
+            *self.withheld_ids,
+            *(chunk.chunk_id for chunk in self.chunks if chunk.review_status != "published"),
+        ]
+        return tuple(dict.fromkeys(candidates))
 
     @property
     def is_empty(self) -> bool:
         return not self.chunks
+
+
+@dataclass(frozen=True)
+class WritingFeedback:
+    """ADR-005 §Task-specific additions: proposal-only writing feedback."""
+
+    suggested_text: str
+    explanation: str
+    examples: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ValidatedResponse:
+    """ADR-005: the typed response the validator has accepted.
+
+    Only this object may produce learner-visible text. Source titles and
+    sections are resolved later from server-held evidence, never from model text.
+    """
+
+    task: TaskType
+    abstained: bool
+    source_ids: tuple[str, ...]
+    answer: str
+    follow_up: str | None = None
+    tips: tuple[str, ...] = ()
+    writing_feedback: WritingFeedback | None = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +148,7 @@ class ModelRequest:
     schema_id: str
     timeout_ms: int
     max_output_tokens: int
+    temperature: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -112,6 +178,9 @@ class ValidationVerdict:
     repairable: bool = False
     error_path: str = ""
     validated_text: str | None = None
+    response: ValidatedResponse | None = None
+    validation_id: str = ""
+    detail: str = ""
 
 
 class ResponseValidator(Protocol):
