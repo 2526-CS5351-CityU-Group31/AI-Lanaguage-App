@@ -21,12 +21,97 @@ Each PR has exactly **one** reviewer and **one** memo section. The author fills 
 
 | PR | Title | Commit range | Author | Reviewer | Date | Verdict |
 |---|---|---|---|---|---|---|
+| PR-5 | ADR-005 validated response contract (CitationValidator, versioned prompt, bounded repair) | `5354054..2e94ddd` | Member 2 (Leon) | Member 1 (Adrian) / PM + Member 5 | 2026-11-14 | CHANGES REQUIRED (pending R-1 second review) |
 | PR-4 | AI companion foundation (contracts, retrieval, prompt, tutor, proposal-only RagPipeline) | `1fff55d..97faaec` | Member 2 (Leon) | Member 1 (Adrian) / PM | 2026-11-11 | APPROVE |
 | - | No implementation PR exists as of 2026-10-27 | - | - | - | - | - |
 
 There are **zero** merged code or prompt PRs at baseline. The baseline documentation is not a PR and is not reviewed here; the first memo will cover PR-001, the first implementation change.
 
 ## 2. Memo template (copy per PR, newest first)
+
+### MEMO-002 - PR-5: ADR-005 validated response contract (CitationValidator, versioned prompt, bounded repair)
+
+| Field | Value |
+|---|---|
+| PR id, title | 5 - ADR-005 validated response contract |
+| Commit range | `5354054..2e94ddd` (commits `2aba3f1`, `2c8d3b4`, `ff4c945`, `2706012`, `903d50d`, `2e94ddd`) |
+| Author / reviewer | Member 2 (Leon) / Member 1 (Adrian), PM |
+| Date | 2026-11-14 |
+| Linked requirements | `INV-CITE-001` (partial), `NFR-QUAL-003` (partial), `FR-CHAT-001` (partial), `FR-RAG-001` (partial), `FR-FEED-001` (partial), `NFR-COST-001`, `NFR-SEC-001` (partial), `NFR-PERF-001` (partial), `NFR-GOV-002` |
+| Linked ADR / invariants | ADR-001, ADR-005, ADR-006, ADR-007; INV-CITE-001, NFR-QUAL-003 |
+| Plan approval | In-session per `ai-use-log.yaml` SES-026, SES-027 (human-approved plan; tests-first; commit split) |
+| AI use log | SES-026, SES-027 (SHA references refreshed by reviewer to `2aba3f1`/`2c8d3b4`/`2706012`/`903d50d`; verified ancestors of `HEAD`) |
+| CI run | CI green on `2e94ddd` per branch author. Reviewer did not re-run pytest/mypy (no interpreter with the toolchain in the review session); findings below are from a manual source review of the authoritative gate and static inspection of the remainder. |
+| Verdict | CHANGES REQUIRED (pending R-1 second review by Member 5) |
+
+**Reviewer note.** This memo reviews governance and the author's requested confirmations. The invariant-bearing path `src/backend/safety_boundary/citation_validator.py` (620 lines) was read end-to-end by the reviewer against ADR-005, INV-CITE-001 and NFR-QUAL-003, using a structured pass over the four pure helpers, the validation-order contract, the "never repairable" audit, and the markup-scan coverage. That is the **first** of the two human reviewers required by `permission-model.md` §2 for the citation gate; the **second reviewer (Member 5) has not yet reviewed the file**, so R-1 remains open and the verdict stays CHANGES REQUIRED until that review is recorded. The other gate modules (`scope_guard.py`, `auth/security.py`) are not in this PR and their `DBT-008` assignment is unchanged.
+
+#### `citation_validator.py` manual review (the three invariant-bearing confirmations)
+
+| # | Check | Verdict | Evidence |
+|---|---|---|---|
+| A | Helpers: fail-closed parse and boundary-safe id matching | **PASS** | `_no_duplicates`/`_reject_json_constant` (`:73-91`) raise on duplicate keys and non-finite constants; `_validation_id` (`:94-99`) is deterministic SHA-256 over task + raw output + evidence ids; `_mentions_chunk_id`/`_chunk_id_family_pattern` (`:125-147`) use `(?<![A-Za-z0-9_])` boundaries. See C-1: the `withheld` local at `:97,397` is assigned `unpublished_ids`, which is the correct superset of `withheld_ids` (`contracts:91-98`); naming-only, no behavioural effect. |
+| B | Safety-first validation order | **PASS** | `tool_request` (`:232-239`) and all `citation_*`/`abstention_*` (`:394-486`) are decided before duplicate-id, unknown-field, length and markup checks (`:456-602`). Matches the stated intent at `:394-395`; a mixed failure cannot be repaired. |
+| C | Non-repairable codes carry no `repairable=True` | **PASS (double-guarded)** | No `tool_request`/`citation_unknown`/`citation_unpublished`/`abstention_inconsistent` reject block sets `repairable=True` (`:236,404,410,426,448,469,476,483`). Even if one did, `RagPipeline`'s `SAFE_REPAIR_CODES` allowlist (`rag_pipeline.py:52-54,422-423`) requires both `repairable` and a repairable code, so a retry is impossible. |
+| D | Markup scan covers every learner-visible field | **PASS** | `text_fields` (`:577-593`) includes `answer`, `follow_up`, every `tips[i]`, and for `writing_feedback` `suggested_text`, `explanation`, `examples[i]`; `_has_unsafe_markup` (`:120-122`) covers raw HTML, URLs and markdown links. |
+| E | Accepted path returns only `validated_text` | **PASS** | `:604-620` builds `ValidatedResponse` and returns it with `validated_text=response.answer`; `RagPipeline._accepted` (`rag_pipeline.py:364-375`) rejects an accepted verdict lacking text as `validator_contract_violation`. |
+
+#### Author-requested confirmations
+
+| # | Claim | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Pipeline never returns `tutor_result.text` / `repair_result.text` as learner text | **CONFIRMED** | Every `text=` in `rag_pipeline.py` is an evidence chunk (`:187`), `validated_text` (`:379`), `INSUFFICIENT_EVIDENCE_PHRASE` (`:456`), `SAFE_FALLBACK_MESSAGE` (`:481`), or assembler schema text (`:522`). Model text reaches only `self._validator.validate(...)` (`:225`, `:299`). |
+| 2 | Gateway called at most twice; second call only on schema/length/markup | **CONFIRMED** | Two `_generate` calls (`:206`, `:278`), both `temperature=0.0`; second gated by `_can_repair`, repair prompt budget-checked (`:262-275`); second failure final (`:325`). |
+| 3 | `citation_*`, `abstention_inconsistent`, `tool_request` never repaired | **CONFIRMED** | See confirmation C above; double-guarded. |
+| 4 | Withheld draft/retired ids never in `published_ids` or the assembled prompt | **CONFIRMED** | `published_ids` filters `review_status == "published"` (`contracts:82-89`); withheld ids feed only `unpublished_ids` and never `RagResult.evidence_ids`; prompt built only from adapter-filtered `evidence.chunks` (`rag_pipeline.py:182-190`; `retrieval_adapter.py:71-86`). |
+| 5 | Human author/reviewer on gated paths | **PENDING (R-1)** | `citation_validator.py` read end-to-end by the PM as first reviewer against ADR-005/INV-CITE-001/NFR-QUAL-003; `prompts/prompt_v1.0.0.yaml` read by the PM. The second reviewer (Member 5) has not yet reviewed the file, so the two-reviewer `permission-model.md` §2 requirement is not yet fully met. |
+| 6 | Deferred structural/adversarial/eval gates acceptable | **ACCEPTED (R-3)** | `test/structural/` (Tier-1), `evals/`+`run_eval.py` (Gate 4), and `test_prompt_injection.py` (`NFR-SEC-001`) are absent. Accepted as deferred; trace status stays partial/declared. |
+| 7 | SES-026/027 commit references refreshed | **CONFIRMED (R-2)** | Reviewer refreshed four SHAs in `ai-use-log.yaml`; all resolve as ancestors of `HEAD`; no stale references remain. |
+
+**Spec alignment**
+
+- Serves `INV-CITE-001`, `NFR-QUAL-003`, `FR-CHAT-001`, `FR-RAG-001`, `FR-FEED-001` (all partial), plus `NFR-COST-001`, `NFR-SEC-001` (structural/partial) — all cited in module/test docstrings.
+- No fit criterion or threshold altered; no requirements file change. No requirement marked `implemented`/`verified` without evidence.
+
+**Architecture alignment**
+
+- Authoritative `CitationValidator` is in its SSOT module (`safety_boundary/citation_validator.py`), imports only stdlib + `backend.contracts`, and is consumed via the injected `ResponseValidator` port — advisory→authoritative boundary preserved (S4 C1/C3/C4).
+- `prompts/prompt_v1.0.0.yaml` is versioned and validated fail-closed by `load_prompt_catalog` (version↔filename, required keys, abstention phrase, repair placeholders).
+- No frozen path changed (verified zero diff on `docs/req`, ADRs, blueprint, invariants, `.github`, `.opencode`, `.agent`, `AGENTS.md`, `Prompt.md`, `evals`).
+
+**Code quality**
+
+- One element per module; names match `structural-constraints.md` S1. Docstrings carry `ADR-`/`INV-`/`NFR-` tags (S3). No env/network/file IO in `safety_boundary` (S5); the only new file read is the explicit, caller-supplied prompt path (`prompt_assembly.py:376`).
+- Deterministic, fail-closed on parse/validator/tutor failures.
+
+**Test quality**
+
+- New `test_citation_validator.py` (citation, provenance, abstention, markup, tool-field, ordering) and `test_prompt_catalog.py`; expanded `test_rag.py`/`test_tutor.py`. Positive and negative coverage present. Tests not re-executed in this review session (see CI run row). `test/**` additions are Member 5's lane and require their QA sign-off.
+
+**Security**
+
+- Unknown fields, `tool`/`function`/`role`/`system`/`url` fields, raw HTML, URLs and links rejected. Retrieved evidence delimited as untrusted data. Adversarial injection suite (`NFR-SEC-001`) deferred (R-3).
+
+**Efficiency**
+
+- 1,500-token assembly cap unchanged (`NFR-COST-001`); repair prompt budget-checked before the second call; at most two model calls per turn at temperature 0.
+
+**Findings**
+
+| ID | Severity | File:line | Finding | Cited invariant/ADR | Resolution |
+|---|---|---|---|---|---|
+| R-1 | P1 | `src/backend/safety_boundary/citation_validator.py`; `prompts/prompt_v1.0.0.yaml` | Invariant-bearing paths were authored by the AI session with no human author/review pair recorded. | `permission-model.md` §1–2 (`guard_authority_module`, `guard_prompt`, `HUMAN_ONLY`); `DBT-008` | **PARTIAL — 1 of 2 reviewers.** Member 1 (PM) read `citation_validator.py` end-to-end against ADR-005/INV-CITE-001/NFR-QUAL-003 and read the prompt file. **Member 5 (second reviewer) has not yet reviewed** the file; R-1 stays open until that review is recorded. `scope_guard.py`/`auth/security.py` also remain unassigned in `DBT-008`. |
+| R-2 | P1 | `docs/code-governance/ai-use-log.yaml:284,300` | SES-026/027 cited four SHAs (`b6ef5e8`, `f3d82aa`, `91c478e`, `8c56e16`) that are not ancestors of `HEAD`. | `NFR-GOV-002`; Gate 6 | **RESOLVED** — refreshed to `2aba3f1`/`2c8d3b4`/`2706012`/`903d50d`; verified ancestors. |
+| R-3 | P2 (decision) | `test/structural/`, `evals/`, `test/offline/test_safety_boundary/test_prompt_injection.py` | Tier-1 structural suite, Gate 4 evaluation, and `NFR-SEC-001` adversarial gate are absent/deferred. | `verification-constraints.md` §3; `DBT-001`, `DBT-003`, `NFR-SEC-001` | Accepted as deferred; trace status kept partial/declared. No invariant recorded as verified. |
+| R-4 | P2 (note) | `src/backend/api/` (absent on branch) | Merging this PR alone does not unblock Frontend/Backend: no API router exists on this branch; `CS5351/backend` holds `api/routers/chat.py`. | FR-CHAT-001 (partial) | Integration order: merge this branch → integrate `CS5351/backend` → wire `RagResult.response`/`validation_id` to the chat response schema. |
+| C-1 | P2 | `src/backend/safety_boundary/citation_validator.py:97,397` | The local named `withheld` is assigned `evidence.unpublished_ids` (the superset of `withheld_ids`). Behaviour is correct; naming is loose versus the "withheld ids" prose. | ADR-005 (server-assigned id) | Reconcile variable name or prose in a follow-up; no correctness risk. |
+| C-2 | P2 | `src/backend/safety_boundary/citation_validator.py:135-147,439-454` | Tips family-match replaces every digit-run with `\d+`, so a known id like `lesson1` matches `lesson2` in a tip → `citation_unknown` (non-repairable). Deliberate anti-invention hardening, but can reject valid prose; undocumented boundary. | ADR-005 citation rules | Add a documenting negative test in a follow-up. |
+
+No unresolved P0/P1. No authority/gate bypass, no secret, no cross-user path in the reviewed diff.
+
+**Verdict rationale**
+
+`CHANGES REQUIRED` — a single outstanding item, **R-1**: the two-reviewer requirement for the invariant-bearing citation path. Member 1 (PM) has completed the first full manual review of `citation_validator.py` against ADR-005/INV-CITE-001/NFR-QUAL-003 (helpers, validation order, non-repairable audit, markup coverage, accepted-text ownership) and read the prompt file; **Member 5 must complete the second review** and record it here before merge. R-2 is resolved and the SES commit references are refreshed. Confirmations #1-#4, #6, #7 hold; #5 is pending on Member 5. R-3 (deferred structural/adversarial/eval gates) and R-4 (API/frontend integration order) are accepted and recorded; C-1/C-2 are P2 follow-ups. `DBT-008` is annotated as partially paid (one of two reviewers on the citation path) and remains open. This flips to `APPROVE` once Member 5's review is recorded.
 
 ### MEMO-001 - PR-4: AI companion foundation (contracts, retrieval, prompt, tutor, proposal-only RagPipeline)
 
