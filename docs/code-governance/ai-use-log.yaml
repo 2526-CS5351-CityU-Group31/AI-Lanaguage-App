@@ -312,3 +312,13 @@ sessions:
       - "test/live/test_provider_gateway.py"
       - "docs/code-governance/ai-use-log.yaml"
     human_interventions: "Human approved the Stage-1 execution plan and the Stage-2 test specification. Agent wrote the offline and live tests first, then implemented the frozen config factory and the CityU ModelGateway adapter, verified 176 offline tests plus mypy --strict, and committed the tests as f2b0027, config as 51803b9, adapter as 509118d, and live test as e8eb4f6. The live test skips without LLM_API_KEY; no live NFR-PERF-001 or NFR-COST-001 evidence was produced. provider_gateway.py is a support adapter for the existing Tutor element, not a new module-map element."
+  - session_id: "SES-029"
+    date: "2026-11-14"
+    member: "Leon"
+    branch: "ai/rag-runtime"
+    agent: "opencode (deepseek-v4.1-flash)"
+    purpose: "Run the guarded CityU provider gateway live smoke test with the operator-provided LLM_API_KEY and record the result."
+    files_touched:
+      - "test/live/test_provider_gateway.py"
+      - "docs/code-governance/ai-use-log.yaml"
+    human_interventions: "Human requested the live check after Stage 3 review. Agent bridged the existing Windows User/Machine-scope LLM_API_KEY into the test process without printing it; the guarded live test made one structured request, passed in 2.14s, and asserted non-empty JSON text and non-negative usage. No prompt, completion, key, or provider body was printed. NFR-PERF-001 and NFR-COST-001 remain unverified; this was a single functional smoke test, not p95 latency or cost evidence."
