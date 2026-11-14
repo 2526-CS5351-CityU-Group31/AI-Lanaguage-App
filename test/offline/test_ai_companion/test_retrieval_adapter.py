@@ -44,6 +44,7 @@ def test_published_only_filter_before_ranking() -> None:
 
     assert [chunk.chunk_id for chunk in result.chunks] == ["published-1"]
     assert result.published_ids == ("published-1",)
+    assert result.withheld_ids == ("draft-1", "retired-1")
 
 
 def test_language_level_topic_prefilter() -> None:
