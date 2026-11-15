@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.backend.auth.security import AuthenticationError
-from src.backend.contracts.models import Principal
+from src.backend.contracts.models import LEARNER_MODE_TO_TASK, Principal
 
 # Approved fixed scope strings (INV-SCOPE-002 / INV-SCOPE-004 / INV-SCOPE-005).
 FIXED_REFUSAL = "I'm sorry, but I can only help with language-learning questions."
@@ -78,12 +78,19 @@ class ChatRouter:
         session_id: str,
         message: str,
         request_id: str,
-    ) -> ChatTurn | dict:
+        learner_mode: str = "text",
+        topic: str | None = None,
+    ) -> dict:
         """Scope-gate the message, then hand accepted turns to the pipeline.
 
         Implements: INV-SCOPE-001 (scope precedes retrieval/model);
           INV-SCOPE-003 (zero calls on rejection); INV-SCOPE-002/004/005
           (fixed strings); FR-CHAT-001
+
+        Returns a FLAT frontend-compatible dict (task/abstained/source_ids/
+        answer/validation_id, optional scope_status/scope_message). The
+        learner_mode selects the tutor task via LEARNER_MODE_TO_TASK but never
+        bypasses the deterministic scope gate.
         """
         self._principal(token)
 
@@ -91,23 +98,49 @@ class ChatRouter:
         verdict: ScopeVerdict = self._scope_guard.classify(message)
 
         if verdict.status == "rejected":
-            return {"status": "rejected", "message": FIXED_REFUSAL}
+            return {
+                "scope_status": "rejected",
+                "scope_message": FIXED_REFUSAL,
+                "answer": "",
+                "source_ids": [],
+            }
         if verdict.status == "uncertain":
-            return {"status": "uncertain", "message": FIXED_CLARIFICATION}
+            return {
+                "scope_status": "uncertain",
+                "scope_message": FIXED_CLARIFICATION,
+                "answer": "",
+                "source_ids": [],
+            }
         if verdict.status == "mixed":
-            return {"status": "mixed", "message": FIXED_RESUBMIT}
+            return {
+                "scope_status": "mixed",
+                "scope_message": FIXED_RESUBMIT,
+                "answer": "",
+                "source_ids": [],
+            }
 
         # Accepted: only now may retrieval/tutor run.
+        task = LEARNER_MODE_TO_TASK.get(learner_mode, "conversation")
         pipeline = self._make_pipeline()
         result = pipeline.run(
             session_id=session_id,
             message=message,
             request_id=request_id,
             requires_grounding=verdict.requires_grounding,
+            task=task,
+            topic=topic,
         )
-        return ChatTurn(
-            session_id=session_id,
-            turn_id=result.get("turn_id", request_id),
-            response=result.get("response", {}),
-            source_ids=tuple(result.get("source_ids", ())),
-        )
+        return {
+            "task": result.get("task", task),
+            "abstained": bool(result.get("abstained", False)),
+            "source_ids": list(result.get("source_ids", [])),
+            "answer": result.get("answer", ""),
+            "validation_id": result.get("validation_id", request_id),
+            "scope_status": "accepted",
+            **({"follow_up": result["follow_up"]} if "follow_up" in result else {}),
+            **({"tips": result["tips"]} if "tips" in result else {}),
+            **({"suggested_text": result["suggested_text"]} if "suggested_text" in result else {}),
+            **({"explanation": result["explanation"]} if "explanation" in result else {}),
+            **({"examples": result["examples"]} if "examples" in result else {}),
+            **({"sources": result["sources"]} if "sources" in result else {}),
+        }
