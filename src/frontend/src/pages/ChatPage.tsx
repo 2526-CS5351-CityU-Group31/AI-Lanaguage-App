@@ -44,6 +44,7 @@ export default function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [mode, setMode] = useState<LearnerMode>("conversation_practice");
   const [input, setInput] = useState("");
+  const [topic, setTopic] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,10 +68,13 @@ export default function ChatPage() {
     setError(null);
     try {
       const id = await ensureSession();
+      // Include topic only when non-empty; never derive it from the message.
+      const trimmedTopic = topic.trim();
       const response = await sendMessage(id, {
         learner_mode: mode,
         message: text,
         request_id: newRequestId(),
+        ...(trimmedTopic ? { topic: trimmedTopic } : {}),
       });
       setTurns((prev) => [...prev, { originalText: text, learnerMode: mode, response }]);
       setInput("");
@@ -129,6 +133,20 @@ export default function ChatPage() {
         {error ? <ErrorState message={error} /> : null}
 
         <form onSubmit={handleSubmit} className="composer" aria-label="Composer">
+          <div className="field topic-field">
+            <label htmlFor="topic">Topic (optional)</label>
+            <input
+              id="topic"
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="e.g. Food, Travel, Job interview"
+              aria-describedby="topic-help"
+            />
+            <span id="topic-help" className="field-help">
+              Used to guide this practice session. Leave blank if unsure.
+            </span>
+          </div>
           <label htmlFor="message" className="sr-only">Message</label>
           <textarea
             ref={textareaRef}

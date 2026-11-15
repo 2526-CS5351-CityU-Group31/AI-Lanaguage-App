@@ -38,6 +38,7 @@ const QUICK_ACTIONS: Array<{
 export default function ProgressPage({ level }: { level?: CefrLevel }) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -57,11 +58,29 @@ export default function ProgressPage({ level }: { level?: CefrLevel }) {
     void load();
   }, []);
 
+  /**
+   * Re-fetch progress from the backend and replace displayed values with the
+   * freshly returned server aggregates. No client-side arithmetic is performed
+   * (INV-PROG-001). On failure the last values stay visible and the error shows.
+   */
+  async function refresh() {
+    setRefreshing(true);
+    setError(null);
+    try {
+      const data = await getProgress();
+      setMetrics(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to refresh progress.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   if (loading) {
     return <LoadingState label="Loading progress…" />;
   }
 
-  if (error) {
+  if (error && !metrics) {
     return <ErrorState message={error} onRetry={load} />;
   }
 
@@ -75,12 +94,24 @@ export default function ProgressPage({ level }: { level?: CefrLevel }) {
     <main className="page progress-page">
       <header className="dashboard-header">
         <h1>Welcome back</h1>
-        {level ? (
-          <span className="level-badge" aria-label={`Current CEFR level ${level}`}>
-            {level}
-          </span>
-        ) : null}
+        <div className="dashboard-actions">
+          {level ? (
+            <span className="level-badge" aria-label={`Current CEFR level ${level}`}>
+              {level}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="refresh-progress"
+            onClick={() => void refresh()}
+            disabled={refreshing}
+          >
+            {refreshing ? "Refreshing…" : "Refresh progress"}
+          </button>
+        </div>
       </header>
+
+      {error ? <ErrorState message={error} onRetry={refresh} /> : null}
 
       <dl className="metrics">
         <div className="metric-card">

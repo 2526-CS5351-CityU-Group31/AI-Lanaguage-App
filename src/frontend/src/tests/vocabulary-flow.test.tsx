@@ -96,6 +96,83 @@ describe("FR-VOC-002 familiarity state", () => {
   });
 });
 
+describe("FR-VOC-002 save feedback", () => {
+  it("FR-VOC-002: a confirmation appears only after a successful response", async () => {
+    let resolvePost: (() => void) | null = null;
+    server.use(
+      http.post("/api/me/vocabulary/:entryId", async ({ params, request }) => {
+        const body = (await request.json()) as { state?: string };
+        await new Promise<void>((resolve) => {
+          resolvePost = resolve;
+        });
+        return HttpResponse.json({ entry_id: params.entryId, state: body.state }, { status: 200 });
+      }),
+    );
+    renderVocab();
+    await screen.findByText("resilient");
+    fireEvent.click(screen.getByRole("button", { name: /mastered/i }));
+
+    // The request is still in flight; no confirmation yet.
+    expect(screen.queryByText(/saved as mastered/i)).not.toBeInTheDocument();
+
+    // Let the server respond.
+    await waitFor(() => expect(resolvePost).not.toBeNull());
+    resolvePost!();
+
+    expect(await screen.findByText(/saved as mastered/i)).toBeInTheDocument();
+  });
+
+  it("FR-VOC-002: the successfully selected state receives an accessible indication", async () => {
+    server.use(
+      http.post("/api/me/vocabulary/:entryId", async ({ params, request }) => {
+        const body = (await request.json()) as { state?: string };
+        return HttpResponse.json({ entry_id: params.entryId, state: body.state }, { status: 200 });
+      }),
+    );
+    renderVocab();
+    await screen.findByText("resilient");
+    fireEvent.click(screen.getByRole("button", { name: /familiar/i }));
+
+    await screen.findByText(/saved as familiar/i);
+    const familiarButton = screen.getByRole("button", { name: /familiar/i });
+    expect(familiarButton).toHaveAttribute("aria-pressed", "true");
+    const masteredButton = screen.getByRole("button", { name: /mastered/i });
+    expect(masteredButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("FR-VOC-002: a failed request keeps the previous successful state", async () => {
+    server.use(
+      http.post("/api/me/vocabulary/:entryId", async ({ params, request }) => {
+        const body = (await request.json()) as { state?: string };
+        if (body.state === "mastered") {
+          return HttpResponse.json({ entry_id: params.entryId, state: body.state }, { status: 200 });
+        }
+        return HttpResponse.json(
+          {
+            error_code: "invalid_state",
+            message: "Unknown familiarity state.",
+            field_errors: { state: "Invalid state." },
+          },
+          { status: 422 },
+        );
+      }),
+    );
+    renderVocab();
+    await screen.findByText("resilient");
+
+    // First a successful save.
+    fireEvent.click(screen.getByRole("button", { name: /mastered/i }));
+    expect(await screen.findByText(/saved as mastered/i)).toBeInTheDocument();
+
+    // Then a failing save; the previous successful state must remain.
+    fireEvent.click(screen.getByRole("button", { name: /familiar/i }));
+    expect(await screen.findByText(/invalid state/i)).toBeInTheDocument();
+    expect(screen.getByText(/saved as mastered/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mastered/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /familiar/i })).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
 describe("VS-16 accessibility", () => {
   it("VS-16: vocabulary page has zero critical axe violations", async () => {
     const { container } = renderVocab();

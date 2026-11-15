@@ -23,6 +23,7 @@ export default function VocabularyPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [savedStates, setSavedStates] = useState<Record<string, FamiliarityState>>({});
 
   async function load() {
     setLoading(true);
@@ -46,7 +47,10 @@ export default function VocabularyPage() {
     setActionError(null);
     try {
       await recordFamiliarity(entryId, state);
+      // Only after a successful response record the confirmed state.
+      setSavedStates((prev) => ({ ...prev, [entryId]: state }));
     } catch (err) {
+      // Keep the previous successful state; surface the error.
       if (err instanceof ApiError) {
         const fieldMessage = err.fieldErrors ? Object.values(err.fieldErrors).join(" ") : "";
         setActionError(fieldMessage || err.message);
@@ -80,6 +84,7 @@ export default function VocabularyPage() {
             key={card.entry_id}
             card={card}
             saving={saving}
+            savedState={savedStates[card.entry_id]}
             onStateChange={handleStateChange}
           />
         ))}

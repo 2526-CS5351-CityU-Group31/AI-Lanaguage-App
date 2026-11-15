@@ -973,3 +973,46 @@ button.starter-chip:hover {
     border-radius: 20px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Progress refresh + chat topic + vocabulary save feedback (presentation only).
+ * ------------------------------------------------------------------------- */
+.dashboard-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.refresh-progress {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.topic-field {
+  margin-bottom: 0.75rem;
+}
+
+.topic-field input {
+  width: 100%;
+}
+
+.vocab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.state-button.is-selected {
+  background: var(--accent-yellow);
+  color: #0b2a1b;
+  border-color: var(--accent-yellow);
+  font-weight: 800;
+}
+
+.vocab-saved {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-weight: 700;
+}

@@ -116,6 +116,70 @@ describe("learner mode selection maps to the correct tutor path", () => {
   });
 });
 
+describe("FR-CHAT-001 topic input", () => {
+  it("FR-CHAT-001: a non-empty topic is included and trimmed in the message request", async () => {
+    let received: Record<string, unknown> | null = null;
+    server.use(
+      http.post("/api/sessions", () => HttpResponse.json({ session_id: "s1" }, { status: 200 })),
+      http.post("/api/sessions/:id/messages", async ({ request }) => {
+        received = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          { task: "conversation", abstained: false, source_ids: [], answer: "Hello!", validation_id: "v1" },
+          { status: 200 },
+        );
+      }),
+    );
+    renderChat();
+    fireEvent.click(screen.getByRole("radio", { name: /conversation practice/i }));
+    fireEvent.change(screen.getByLabelText(/topic/i), { target: { value: "  Food  " } });
+    fireEvent.change(screen.getByLabelText(/message/i), { target: { value: "Let's practise ordering food." } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await waitFor(() => expect(received).not.toBeNull());
+    expect(received).toMatchObject({ topic: "Food" });
+  });
+
+  it("FR-CHAT-001: an empty topic is omitted from the message request", async () => {
+    let received: Record<string, unknown> | null = null;
+    server.use(
+      http.post("/api/sessions", () => HttpResponse.json({ session_id: "s1" }, { status: 200 })),
+      http.post("/api/sessions/:id/messages", async ({ request }) => {
+        received = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          { task: "conversation", abstained: false, source_ids: [], answer: "Hello!", validation_id: "v1" },
+          { status: 200 },
+        );
+      }),
+    );
+    renderChat();
+    fireEvent.click(screen.getByRole("radio", { name: /conversation practice/i }));
+    fireEvent.change(screen.getByLabelText(/message/i), { target: { value: "Hi tutor" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await waitFor(() => expect(received).not.toBeNull());
+    expect(received).not.toHaveProperty("topic");
+  });
+
+  it("FR-CHAT-001: a whitespace-only topic is omitted from the message request", async () => {
+    let received: Record<string, unknown> | null = null;
+    server.use(
+      http.post("/api/sessions", () => HttpResponse.json({ session_id: "s1" }, { status: 200 })),
+      http.post("/api/sessions/:id/messages", async ({ request }) => {
+        received = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          { task: "conversation", abstained: false, source_ids: [], answer: "Hello!", validation_id: "v1" },
+          { status: 200 },
+        );
+      }),
+    );
+    renderChat();
+    fireEvent.click(screen.getByRole("radio", { name: /conversation practice/i }));
+    fireEvent.change(screen.getByLabelText(/topic/i), { target: { value: "   " } });
+    fireEvent.change(screen.getByLabelText(/message/i), { target: { value: "Hi tutor" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await waitFor(() => expect(received).not.toBeNull());
+    expect(received).not.toHaveProperty("topic");
+  });
+});
+
 describe("INV-SCOPE-002/004/005 scope status rendered verbatim and separate", () => {
   it("INV-SCOPE-002: an off-topic rejection shows the exact fixed refusal with no tutor answer", async () => {
     const refusal = "I'm sorry, but I can only help with language-learning questions.";

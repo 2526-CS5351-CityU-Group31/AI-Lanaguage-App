@@ -10,7 +10,7 @@
  * (production modules are created in Gate 3; imports fail until then by design).
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { axe } from "jest-axe";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
@@ -101,6 +101,38 @@ describe("FR-DASH-001 dashboard metrics", () => {
       expect(icon).toHaveAttribute("aria-hidden", "true");
       expect(icon).toHaveAttribute("focusable", "false");
     }
+  });
+});
+
+describe("FR-DASH-001 refresh progress", () => {
+  it("FR-DASH-001: clicking Refresh progress makes another request and replaces values verbatim", async () => {
+    let calls = 0;
+    server.use(
+      http.get("/api/me/progress", () => {
+        calls += 1;
+        const payload =
+          calls === 1
+            ? { sessions: 7, words_reviewed: 42, mastered_vocabulary: 11, recent_topics: ["travel"] }
+            : { sessions: 8, words_reviewed: 50, mastered_vocabulary: 12, recent_topics: ["food"] };
+        return HttpResponse.json(payload, { status: 200 });
+      }),
+    );
+    renderProgress();
+
+    // Initial load shows the first server response.
+    expect(await screen.findByTestId("metric-sessions")).toHaveTextContent("7");
+    expect(calls).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /refresh progress/i }));
+
+    // The freshly returned server values replace the displayed values.
+    await waitFor(() => expect(calls).toBe(2));
+    await waitFor(() => expect(screen.getByTestId("metric-sessions")).toHaveTextContent("8"));
+    expect(screen.getByTestId("metric-words_reviewed")).toHaveTextContent("50");
+    expect(screen.getByTestId("metric-mastered_vocabulary")).toHaveTextContent("12");
+
+    // Verbatim rendering: no client-side arithmetic (7 + 1 != 15, etc.).
+    expect(screen.getByTestId("metric-sessions")).not.toHaveTextContent("15");
   });
 });
 
