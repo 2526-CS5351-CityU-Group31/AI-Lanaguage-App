@@ -1,7 +1,9 @@
 """PromptAssembler - layered context assembly within a fixed prompt-token budget.
 
 Element: PromptAssembler
-Implements: ADR-006 §Decision and §Assembly pipeline; NFR-COST-001, FR-CHAT-001.
+Implements: ADR-005 §Response contracts (versioned prompt catalogue);
+ADR-006 §Decision and §Assembly pipeline; NFR-COST-001, NFR-GOV-002,
+FR-CHAT-001.
 Structural support only for NFR-SEC-001: retrieved evidence is delimited as
 untrusted data. The authoritative injection gate remains outside this module.
 """
@@ -14,10 +16,24 @@ import unicodedata
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from enum import Enum
+from pathlib import Path
+from types import MappingProxyType
 from typing import Callable, Literal, Mapping, Sequence
+
+from backend.contracts.ai_companion import (
+    INSUFFICIENT_EVIDENCE_PHRASE,
+    TaskType,
+)
 
 TokenCounter = Callable[[str], int]
 HistoryRole = Literal["learner", "tutor"]
+PROMPT_VERSION_PATTERN = re.compile(r"^prompt_v\d+\.\d+\.\d+$")
+PROMPT_TASKS: tuple[TaskType, ...] = (
+    "conversation",
+    "lesson_help",
+    "writing_feedback",
+)
+PROMPT_SCHEMA_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.v\d+$")
 
 DEFAULT_TOKEN_BUDGET = 1500
 DEFAULT_COMPACTION_MESSAGE_LIMIT = 6
@@ -49,6 +65,41 @@ class AssemblyErrorCode(str, Enum):
     CURRENT_TURN_TOO_LONG = "current_turn_too_long"
     PROTECTED_LAYER_OVER_BUDGET = "protected_layer_over_budget"
     BUDGET_UNSATISFIABLE = "budget_unsatisfiable"
+
+
+class PromptCatalogError(ValueError):
+    """ADR-005/ADR-006: a prompt file cannot be trusted; no model call is allowed."""
+
+
+@dataclass(frozen=True)
+class PromptSchema:
+    """ADR-005: one task-specific response-schema block from the prompt file."""
+
+    schema_id: str
+    text: str
+
+
+@dataclass(frozen=True)
+class PromptCatalog:
+    """ADR-005/ADR-006: the versioned prompt assets loaded from ``prompts/``."""
+
+    version: str
+    identity_policy: str
+    standing_constraints: str
+    schemas: Mapping[TaskType, PromptSchema]
+    repair_template: str
+
+    @property
+    def prompt_version(self) -> str:
+        """ADR-006: the version recorded in audit and assembly metadata."""
+        return self.version
+
+    def schema_for(self, task: TaskType) -> PromptSchema:
+        """Return the task schema or fail closed on an unknown task."""
+        try:
+            return self.schemas[task]
+        except KeyError as exc:
+            raise PromptCatalogError(f"prompt has no schema for task {task!r}") from exc
 
 
 @dataclass(frozen=True)
@@ -200,6 +251,202 @@ class PromptAssemblyError(Exception):
 def estimate_tokens(text: str) -> int:
     """NFR-COST-001 / ADR-006: deterministic fallback token estimate."""
     return math.ceil(len(text) / 4)
+
+
+def _split_prompt_lines(text: str) -> list[str]:
+    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+
+def _indent_of(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def _is_ignorable(line: str) -> bool:
+    stripped = line.strip()
+    return stripped == "" or stripped.startswith("#")
+
+
+def _parse_block_scalar(
+    lines: Sequence[str],
+    start: int,
+    parent_indent: int,
+) -> tuple[str, int]:
+    block_lines: list[str] = []
+    block_indent: int | None = None
+    index = start
+    while index < len(lines):
+        raw = lines[index]
+        if raw.strip() == "":
+            block_lines.append("")
+            index += 1
+            continue
+        indent = _indent_of(raw)
+        if indent <= parent_indent:
+            break
+        if block_indent is None:
+            block_indent = indent
+        if indent < block_indent:
+            raise PromptCatalogError(
+                "prompt file block scalar is less indented than its first line"
+            )
+        block_lines.append(raw[block_indent:])
+        index += 1
+    while block_lines and block_lines[-1] == "":
+        block_lines.pop()
+    if not block_lines:
+        return "", index
+    return "\n".join(block_lines) + "\n", index
+
+
+def _parse_prompt_mapping(
+    lines: Sequence[str],
+    start: int,
+    indent: int,
+) -> tuple[dict[str, object], int]:
+    result: dict[str, object] = {}
+    index = start
+    while index < len(lines):
+        raw = lines[index]
+        if _is_ignorable(raw):
+            index += 1
+            continue
+        line_indent = _indent_of(raw)
+        if line_indent < indent:
+            break
+        if line_indent > indent:
+            raise PromptCatalogError("prompt file has an unexpected indentation")
+        content = raw[indent:]
+        match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*):(?:[ ](.*))?", content)
+        if match is None:
+            raise PromptCatalogError(f"prompt file has an invalid mapping line: {content!r}")
+        key = match.group(1)
+        marker = (match.group(2) or "").strip()
+        if key in result:
+            raise PromptCatalogError(f"prompt file has a duplicate key: {key}")
+        if marker == "|":
+            value, index = _parse_block_scalar(lines, index + 1, indent)
+            result[key] = value
+            continue
+        if marker == "":
+            child_indent: int | None = None
+            probe = index + 1
+            while probe < len(lines):
+                if _is_ignorable(lines[probe]):
+                    probe += 1
+                    continue
+                candidate = _indent_of(lines[probe])
+                if candidate <= indent:
+                    break
+                child_indent = candidate
+                break
+            if child_indent is None:
+                result[key] = ""
+                index += 1
+                continue
+            child, index = _parse_prompt_mapping(lines, index + 1, child_indent)
+            result[key] = child
+            continue
+        if marker.startswith((">", "&", "*", "{", "[")):
+            raise PromptCatalogError(
+                f"prompt file value for {key!r} uses unsupported YAML syntax"
+            )
+        if len(marker) >= 2 and marker[0] == marker[-1] and marker[0] in ("'", '"'):
+            marker = marker[1:-1]
+        result[key] = marker
+        index += 1
+    return result, index
+
+
+def _require_prompt_text(mapping: Mapping[str, object], key: str) -> str:
+    value = mapping.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise PromptCatalogError(f"prompt file field {key!r} must be non-empty text")
+    return value
+
+
+def load_prompt_catalog(path: str | Path) -> PromptCatalog:
+    """Load and validate the versioned prompt file.
+
+    Implements: ADR-005 §Response contracts; ADR-006 §Context layers;
+    NFR-COST-001, NFR-GOV-002. The reader deliberately supports only the
+    prompt-file subset used here and fails closed on anything else.
+    """
+    prompt_path = Path(path)
+    try:
+        text = prompt_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise PromptCatalogError(f"cannot read prompt file {prompt_path}") from exc
+    if not text.strip():
+        raise PromptCatalogError("prompt file is empty")
+    if "\t" in text:
+        raise PromptCatalogError("prompt file must use spaces, not tabs")
+
+    lines = _split_prompt_lines(text)
+    raw, index = _parse_prompt_mapping(lines, 0, 0)
+    if any(line.strip() for line in lines[index:]):
+        raise PromptCatalogError("prompt file has trailing content outside the mapping")
+
+    expected_keys = {
+        "prompt_version",
+        "identity_policy",
+        "standing_constraints",
+        "schemas",
+        "repair_template",
+    }
+    if set(raw) != expected_keys:
+        missing = sorted(expected_keys - set(raw))
+        extra = sorted(set(raw) - expected_keys)
+        raise PromptCatalogError(
+            f"prompt file keys mismatch; missing={missing}, unknown={extra}"
+        )
+
+    version = _require_prompt_text(raw, "prompt_version")
+    if PROMPT_VERSION_PATTERN.fullmatch(version) is None:
+        raise PromptCatalogError("prompt_version must match prompt_vX.Y.Z")
+    if prompt_path.stem != version:
+        raise PromptCatalogError("prompt_version must match the prompt file name")
+
+    identity_policy = _require_prompt_text(raw, "identity_policy")
+    standing_constraints = _require_prompt_text(raw, "standing_constraints")
+    if INSUFFICIENT_EVIDENCE_PHRASE not in standing_constraints:
+        raise PromptCatalogError(
+            "standing_constraints must contain the exact abstention phrase"
+        )
+    repair_template = _require_prompt_text(raw, "repair_template")
+    for placeholder in ("{code}", "{error_path}", "{detail}"):
+        if placeholder not in repair_template:
+            raise PromptCatalogError(
+                f"repair_template must contain the {placeholder} placeholder"
+            )
+
+    schemas_raw = raw["schemas"]
+    if not isinstance(schemas_raw, dict):
+        raise PromptCatalogError("schemas must be a mapping of task to schema")
+    if set(schemas_raw) != set(PROMPT_TASKS):
+        raise PromptCatalogError(
+            "schemas must define exactly conversation, lesson_help and writing_feedback"
+        )
+
+    schemas: dict[TaskType, PromptSchema] = {}
+    for task in PROMPT_TASKS:
+        entry = schemas_raw.get(task)
+        if not isinstance(entry, dict) or set(entry) != {"schema_id", "text"}:
+            raise PromptCatalogError(
+                f"schema for {task!r} must contain exactly schema_id and text"
+            )
+        schema_id = _require_prompt_text(entry, "schema_id")
+        schema_text = _require_prompt_text(entry, "text")
+        if PROMPT_SCHEMA_ID_PATTERN.fullmatch(schema_id) is None:
+            raise PromptCatalogError(f"schema_id for {task!r} has an invalid format")
+        schemas[task] = PromptSchema(schema_id=schema_id, text=schema_text)
+
+    return PromptCatalog(
+        version=version,
+        identity_policy=identity_policy,
+        standing_constraints=standing_constraints,
+        schemas=MappingProxyType(schemas),
+        repair_template=repair_template,
+    )
 
 
 def _render_text_layer(name: LayerName, content: str) -> str:
