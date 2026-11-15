@@ -21,6 +21,7 @@ Each PR has exactly **one** reviewer and **one** memo section. The author fills 
 
 | PR | Title | Commit range | Author | Reviewer | Date | Verdict |
 |---|---|---|---|---|---|---|
+| PR-6 | CityU provider gateway (concrete ModelGateway adapter, frozen config, injected transport) | `2e94ddd..1beb8c6` | Member 2 (Leon) | Member 1 (Adrian) / PM | 2026-11-15 | APPROVE |
 | PR-5 | ADR-005 validated response contract (CitationValidator, versioned prompt, bounded repair) | `5354054..2e94ddd` | Member 2 (Leon) | Member 1 (Adrian) / PM + Member 5 | 2026-11-14 | APPROVE |
 | PR-4 | AI companion foundation (contracts, retrieval, prompt, tutor, proposal-only RagPipeline) | `1fff55d..97faaec` | Member 2 (Leon) | Member 1 (Adrian) / PM | 2026-11-11 | APPROVE |
 | - | No implementation PR exists as of 2026-10-27 | - | - | - | - | - |
@@ -28,6 +29,79 @@ Each PR has exactly **one** reviewer and **one** memo section. The author fills 
 There are **zero** merged code or prompt PRs at baseline. The baseline documentation is not a PR and is not reviewed here; the first memo will cover PR-001, the first implementation change.
 
 ## 2. Memo template (copy per PR, newest first)
+
+### MEMO-003 - PR-6: CityU provider gateway (concrete ModelGateway adapter, frozen config, injected transport)
+
+| Field | Value |
+|---|---|
+| PR id, title | 6 - CityU provider gateway |
+| Commit range | `2e94ddd..1beb8c6` (commits `f2b0027`, `51803b9`, `509118d`, `e8eb4f6`, `13628ca`, `1beb8c6`) |
+| Author / reviewer | Member 2 (Leon) / Member 1 (Adrian), PM |
+| Date | 2026-11-15 |
+| Linked requirements | `FR-CHAT-001` (partial), `NFR-PERF-001` (partial), `NFR-COST-001` (partial), `NFR-SEC-001` (partial), `INV-CITE-001` (support), `NFR-GOV-002` |
+| Linked ADR / invariants | ADR-001, ADR-005, ADR-006, ADR-007; INV-CITE-001 |
+| Plan approval | In-session per `ai-use-log.yaml` SES-028, SES-029 (human-approved plan; tests-first; commit split) |
+| AI use log | SES-028 (implementation), SES-029 (live check); log passes `check_ai_log.py`, 29 valid sessions |
+| CI run | Reviewer reproduced locally: `python3 scripts/{validate_req,check_trace,check_manifest,check_permissions,check_ai_log}.py` all pass with the stated counts; provider-gateway offline suite 59/59 cases (33 test functions) pass under a minimal runner shim. `mypy --strict` not re-run (no mypy in review session); author reports clean on 12 files. `test/structural` absent (Tier 1 not runnable — accepted, DBT-003). |
+| Verdict | APPROVE |
+
+**Reviewer note.** This memo reviews governance and the author's requested confirmations. The provider gateway is an advisory support adapter behind the existing `Tutor`/`ModelGateway` seam; it does not change the acceptance gate, add an architectural element, or add an MCP tool. The reviewer independently re-ran the offline provider suite (59 cases pass) and inspected the adapter for the security-sensitive claims (single attempt, verbatim text, secret/log hygiene, single env reader). No P0/P1 findings.
+
+#### Reviewer checklist
+
+| # | Claim | Verdict | Evidence |
+|---|---|---|---|
+| 1 | `provider_gateway.py` is a support adapter for `Tutor`/`ModelGateway`; no new element or MCP tool | **CONFIRMED** | Module docstring declares it a support adapter; implements the `ModelGateway` port; no module-map/manifest row added; `check_manifest.py` still 23 tools, 0 unowned. |
+| 2 | Exactly one transport attempt; `Tutor` is the only retry authority | **CONFIRMED** | Live probe: one `transport.post` per `complete`. No retry loop in the gateway; retry remains in `tutor.py` (unchanged in this slice). |
+| 3 | Provider text returned unchanged; `CitationValidator` is the only acceptance gate | **CONFIRMED** | `complete()` returns `choices[0].message.content` verbatim (probe echo returned unmodified); no strip/parse/repair/wrap in the gateway. |
+| 4 | No prompt, completion, API key, `Authorization` header or response body in logs or exceptions | **CONFIRMED** | Logs emit only request_id, model_id, token counts, status, retryable, usage_present (`_log_success`/`_log_failure`). `api_key`, headers, request/response body are `repr=False`; probe: secret absent from `repr(config)`. HTTP error bodies never read. |
+| 5 | Only `src/backend/config.py` reads `LLM_API_KEY`; no other env read under `src/backend` | **CONFIRMED** | AST scan of `src/backend/**` → only `src/backend/config.py` references `environ`/`getenv`. |
+| 6 | Stacked-base diff is the approved files; no frozen/prompt/safety/api/auth/db/CI/ADR/req change | **CONFIRMED** | `git diff 2e94ddd..HEAD` for `docs/req`, `docs/architecture`, `prompts`, `safety_boundary`, `api`, `auth`, `database`, `.github` → empty. Leon's code slice is `provider_gateway.py`, `config.py`, `test/live/conftest.py`, `test/live/test_provider_gateway.py`, `test/offline/.../test_provider_gateway.py`. |
+| 7 | `NFR-PERF-001`/`NFR-COST-001` stay partial; the single live smoke test is not p95/cost evidence | **CONFIRMED** | Docstrings and PR mark both partial; the live test asserts only non-empty JSON and non-negative usage and skips without `LLM_API_KEY`. |
+
+**Spec alignment**
+
+- Serves `FR-CHAT-001` (partial: concrete provider call behind `Tutor`; API route deferred), `NFR-PERF-001`/`NFR-COST-001` (partial), `NFR-SEC-001` (partial), `INV-CITE-001` (support). All cited in module/test docstrings.
+- No fit criterion or threshold altered; no requirements change; no invariant marked verified.
+
+**Architecture alignment**
+
+- ADR-001: advisory-only provider seam; no tools, no learner-state writes. The gateway returns a proposal; acceptance stays downstream in `CitationValidator`.
+- ADR-005: requests JSON mode (`response_format={"type":"json_object"}`) but never validates, repairs or strips output — the gate owns acceptance.
+- ADR-006: sends the assembled prompt verbatim and records provider usage. ADR-007: integration test uses the existing published-only retrieval seam; no retrieval change.
+- No frozen path changed.
+
+**Code quality**
+
+- Support adapter behind an injected `HttpTransport` protocol; `UrllibHttpTransport` uses stdlib `urllib.request` with default TLS verification and a bounded timeout from `ModelRequest.timeout_ms`.
+- Typed error mapping: timeout/408/504 → `ModelTimeoutError`; 429 → `ModelRateLimitError`; 5xx/connection → retryable `ModelGatewayError`; other 4xx/3xx → `ModelPermanentError`; malformed JSON/choices/content → `ModelPermanentError`. Missing/malformed usage → `0/0` with `usage_present=False`.
+- Docstrings carry ADR/invariant tags (S3).
+
+**Test quality**
+
+- 33 offline test functions (59 parameterized cases) across request shape, success mapping, verbatim text, usage, typed errors, retry bounds, Tutor/RagPipeline/CitationValidator integration, secret/log safety, no-socket, real `urllib` behaviour, config/S5 and import boundaries. Live test guarded by `LLM_API_KEY`.
+- Reviewer reproduced 59/59 offline cases pass. Correctness not otherwise re-derived line-by-line.
+
+**Security**
+
+- No tools/functions/stream/request_id/schema_id in the request body. No secret, prompt, completion or body in logs or errors. Certificate verification never disabled. HTTP error bodies not read.
+- Adversarial release gate (`NFR-SEC-001` full) not run — deferred, consistent with prior PRs.
+
+**Efficiency / metadata**
+
+- One bounded request per `complete`; usage recorded (not enforced here; the 1,500-token assembly cap remains in `PromptAssembler`). Per-call log line records latency_ms, token counts, status, usage_present.
+
+**Findings**
+
+| ID | Severity | File:line | Finding | Cited invariant/ADR | Resolution |
+|---|---|---|---|---|---|
+| F-1 | P2 | `src/backend/config.py` | Config slice reads only `LLM_API_KEY` and fixes the CityU base URL/model rather than the full `configuration-governance.md` key table. | ADR-006; configuration-governance §2-§5 | Acceptable staged slice; extend the single config module later rather than adding a second env reader. |
+
+No P0/P1 findings. No authority/gate bypass, no secret, no cross-user path, no frozen-path change.
+
+**Verdict rationale**
+
+`APPROVE` — all seven reviewer-checklist claims confirmed by independent re-run (59/59 offline cases; five governance scripts pass) and source inspection of the security-sensitive paths. `provider_gateway.py` is a clean advisory adapter: one transport attempt, verbatim provider text, secret/log hygiene, a single environment reader, and the unchanged `CitationValidator` remains the sole acceptance gate. `NFR-PERF-001`/`NFR-COST-001`/`NFR-SEC-001` remain partial and correctly self-declared; the structural suite and CI Gates 1/4 are absent at this baseline (DBT-002/DBT-003), consistent with the accepted deferral posture. F-1 is a staged-scope P2, not a blocker.
 
 ### MEMO-002 - PR-5: ADR-005 validated response contract (CitationValidator, versioned prompt, bounded repair)
 
