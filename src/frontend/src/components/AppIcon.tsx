@@ -75,13 +75,12 @@ export default function AppIcon({ name }: { name: AppIconName }) {
       {name === "writing" ? (
         <>
           <path d="M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" />
-          <path d="m14.5 7.5 3 3M4 4h7" />
+          <path d="m14.5 7.5 3 3" />
         </>
       ) : null}
       {name === "grammar" ? (
         <>
           <path d="M5 19 10 5h4l5 14M7 14h10" />
-          <path d="M3 5h4" />
         </>
       ) : null}
       {name === "sessions" ? (
