@@ -18,10 +18,12 @@ from fakes import FakeModelGateway, FakeResponseValidator, FakeRetrievalService
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FOUNDATION_FILES = (
     REPO_ROOT / "src/backend/contracts/ai_companion.py",
+    REPO_ROOT / "src/backend/ai_companion/prompt_assembly.py",
     REPO_ROOT / "src/backend/ai_companion/retrieval_adapter.py",
     REPO_ROOT / "src/backend/ai_companion/tutor.py",
     REPO_ROOT / "src/backend/ai_companion/rag_pipeline.py",
 )
+PROMPT_LOADING_FILE = REPO_ROOT / "src/backend/ai_companion/prompt_assembly.py"
 
 FORBIDDEN_ROOTS = {
     "anthropic",
@@ -65,8 +67,12 @@ def test_ai_foundation_imports_are_bounded() -> None:
                 assert not module.startswith(FORBIDDEN_MODULE_PREFIXES), (path, module)
 
 
-def test_ai_foundation_has_no_environment_or_file_io() -> None:
-    """ADR-006 / S5: no environment reads, dotenv, or filesystem access in the foundation."""
+def test_ai_foundation_has_no_environment_or_ambient_file_io() -> None:
+    """ADR-006 / S5: no environment reads or ambient filesystem access.
+
+    The prompt catalog is the one intentional file read; it accepts an explicit
+    path supplied by composition and never discovers paths from the environment.
+    """
     for path in FOUNDATION_FILES:
         tree = _parse(path)
         for node in ast.walk(tree):
@@ -74,6 +80,10 @@ def test_ai_foundation_has_no_environment_or_file_io() -> None:
                 assert node.id not in {"open", "getenv"}, (path, node.id)
             if isinstance(node, ast.Attribute):
                 assert node.attr not in {"environ", "getenv"}, (path, node.attr)
+    prompt_tree = _parse(PROMPT_LOADING_FILE)
+    for node in ast.walk(prompt_tree):
+        if isinstance(node, ast.Name):
+            assert node.id != "open", (PROMPT_LOADING_FILE, node.id)
 
 
 def _request() -> RagRequest:
@@ -115,7 +125,13 @@ def test_no_network_calls_during_pipeline(monkeypatch: pytest.MonkeyPatch) -> No
         ]
     )
     validator = FakeResponseValidator(
-        verdicts=[ValidationVerdict(accepted=True, code="accepted")]
+        verdicts=[
+            ValidationVerdict(
+                accepted=True,
+                code="accepted",
+                validated_text="ok",
+            )
+        ]
     )
     pipeline = RagPipeline(
         retrieval=RetrievalAdapter(

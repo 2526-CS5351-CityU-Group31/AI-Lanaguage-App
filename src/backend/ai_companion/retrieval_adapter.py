@@ -77,6 +77,13 @@ class RetrievalAdapter:
             and (query.topic is None or chunk.topic == query.topic)
             and chunk.score >= self._config.min_score
         ]
+        withheld_ids = tuple(
+            dict.fromkeys(
+                chunk.chunk_id
+                for chunk in candidates
+                if chunk.review_status != "published"
+            )
+        )
 
         best_by_id: dict[str, RetrievedChunk] = {}
         for chunk in published:
@@ -88,7 +95,10 @@ class RetrievalAdapter:
             best_by_id.values(),
             key=lambda chunk: (-chunk.score, chunk.chunk_id),
         )
-        return EvidenceSet(chunks=tuple(ordered[: query.top_k]))
+        return EvidenceSet(
+            chunks=tuple(ordered[: query.top_k]),
+            withheld_ids=withheld_ids,
+        )
 
     def _validate_query(self, query: RetrievalQuery) -> None:
         if not query.query.strip():
