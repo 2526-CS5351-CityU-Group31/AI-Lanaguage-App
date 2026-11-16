@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.backend.api.schemas.profile import ProfileValidationError
 from src.backend.api.routers.chat import ChatRouter
+from src.backend.api.pipeline_factory import build_pipeline_factory
 from src.backend.contracts.models import LearnerMode
 from src.backend.auth.router import (
     AuthenticationError,
@@ -35,21 +36,15 @@ from src.backend.vocabulary.service import VocabularyService, VocabularyStateErr
 
 
 class _NoopPipeline:
-    """Placeholder tutor pipeline: returns a validated-shaped stub turn.
+    """Deprecated alias; the pipeline is provided by api/pipeline_factory.py.
 
-    Implements: FR-CHAT-001 (wire point for the real RagPipeline, owned by
-    Member 2). Makes no network call so offline runs stay deterministic.
+    Implements: FR-CHAT-001 (kept only for backward import compatibility).
     """
 
     def run(self, **kwargs: object) -> dict:
-        task = kwargs.get("task", "conversation")
-        return {
-            "task": task,
-            "abstained": False,
-            "source_ids": [],
-            "answer": "Hello! How can I help you practise English?",
-            "validation_id": "val_" + str(kwargs.get("request_id", "turn")),
-        }
+        from src.backend.api.pipeline_factory import NoopPipeline
+
+        return NoopPipeline().run(**kwargs)
 
 
 def _principal_of(request: Request):
@@ -244,10 +239,18 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
     app.state.vocabulary_service = VocabularyService(entry.stores)
     app.state.progress_service = ProgressService(entry.stores)
     app.state.scope_guard = ScopeGuard()
+    # Read the LLM key from the config boundary (S5): only config reads env.
+    _api_key = None
+    try:
+        from src.backend.config import load_config
+
+        _api_key = load_config().llm_api_key
+    except Exception:
+        _api_key = None
     app.state.chat_router = ChatRouter(
         security=entry.security,
         scope_guard=app.state.scope_guard,
-        pipeline_factory=lambda: _NoopPipeline(),
+        pipeline_factory=build_pipeline_factory(api_key=_api_key),
     )
 
     @app.get("/health")
