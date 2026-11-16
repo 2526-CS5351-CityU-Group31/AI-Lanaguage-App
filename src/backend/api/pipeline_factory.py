@@ -83,8 +83,8 @@ class RagPipelineAdapter:
         )
         try:
             result = self._pipeline.handle(request)
-        except Exception as exc:
-            return {**NoopPipeline().run(**kwargs), "debug_reason": f"exception:{type(exc).__name__}"}
+        except Exception:
+            return NoopPipeline().run(**kwargs)
 
         if result.status == "accepted" and result.text:
             return {
@@ -103,7 +103,6 @@ class RagPipelineAdapter:
             "answer": result.text
             or "I don't have enough verified lesson evidence to answer that yet.",
             "validation_id": "val_" + request.request_id,
-            "debug_reason": f"{result.status}:{result.reason}",
         }
 
 
@@ -120,10 +119,14 @@ def _build_rag_request(*, request_id, task, message, requires_grounding, topic, 
         ),
         standing_constraints=(
             "Only help with English language learning. Never invent lesson "
-            "citations. Keep answers short and level-appropriate."
+            "citations. Keep answers short and level-appropriate. "
+            "Respond with a single valid JSON object only, no prose outside it."
         ),
-        response_schema='{"task": "conversation", "abstained": bool, '
-        '"source_ids": [], "answer": "string", "follow_up": "string"}',
+        response_schema=(
+            'Respond with a JSON object matching this schema: '
+            '{"task": "conversation", "abstained": false, "source_ids": [], '
+            '"answer": "string", "follow_up": "string"}'
+        ),
         schema_id=f"{task}_v1",
         learner_profile=f"CEFR level {level}; target language English.",
         resumable_state="",
