@@ -81,6 +81,18 @@ def _parse_int(raw: str, key: str, low: int, high: int, errors: list[str]) -> in
     return value
 
 
+def _is_loopback_origin(origin: str) -> bool:
+    """True for a loopback dev origin: http://localhost or http://127.0.0.1, any port.
+
+    Implements: configuration-governance §2 (CORS); allows a locally-run
+    frontend to call a prod deployment without weakening external http rules.
+    """
+    if not origin.startswith("http://"):
+        return False
+    host = origin[len("http://"):].split("/", 1)[0].split(":", 1)[0].lower()
+    return host in {"localhost", "127.0.0.1"}
+
+
 def load_config(environ: Mapping[str, str] | None = None) -> Config:
     """Validate the environment once and return a frozen Config.
 
@@ -174,7 +186,9 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         if parsed_calls is not None:
             max_calls = parsed_calls
 
-    # CORS_ALLOWED_ORIGINS: comma list; prod entries must be exact https origins.
+    # CORS_ALLOWED_ORIGINS: comma list. In prod, entries must be exact https
+    # origins, EXCEPT loopback dev origins (http://localhost / http://127.0.0.1,
+    # any port) which are allowed so a locally-run frontend can call prod.
     origins: list[str] = []
     raw_cors = _get(env, "CORS_ALLOWED_ORIGINS")
     if raw_cors:
@@ -184,8 +198,10 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
                 continue
             if origin == "*":
                 errors.append("CORS_ALLOWED_ORIGINS: wildcard not allowed")
-            elif environment == "prod" and not origin.startswith("https://"):
-                errors.append("CORS_ALLOWED_ORIGINS: prod origins must be https")
+            elif environment == "prod" and not origin.startswith("https://") and not _is_loopback_origin(origin):
+                errors.append(
+                    "CORS_ALLOWED_ORIGINS: prod origins must be https or loopback"
+                )
             else:
                 origins.append(origin)
 
