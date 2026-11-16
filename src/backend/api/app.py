@@ -234,6 +234,25 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+    # CORS: exact origins from config (CORS_ALLOWED_ORIGINS). Only config reads
+    # env (S5). Empty list -> no CORS (same-origin deployment).
+    _origins: tuple[str, ...] = ()
+    try:
+        from src.backend.config import load_config as _lc
+
+        _origins = _lc().cors_allowed_origins
+    except Exception:
+        _origins = ()
+    if _origins:
+        from fastapi.middleware.cors import CORSMiddleware
+
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(_origins),
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
     app.state.auth_router = auth_router
     app.state.stores = entry.stores
     app.state.vocabulary_service = VocabularyService(entry.stores)

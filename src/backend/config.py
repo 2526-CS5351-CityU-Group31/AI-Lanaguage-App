@@ -59,6 +59,7 @@ class Config:
     max_ai_calls_per_day: int = 50
     llm_api_key: str | None = None
     llm_model: str | None = None
+    cors_allowed_origins: tuple[str, ...] = ()
 
 
 def _get(environ: Mapping[str, str], key: str) -> str | None:
@@ -173,6 +174,21 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         if parsed_calls is not None:
             max_calls = parsed_calls
 
+    # CORS_ALLOWED_ORIGINS: comma list; prod entries must be exact https origins.
+    origins: list[str] = []
+    raw_cors = _get(env, "CORS_ALLOWED_ORIGINS")
+    if raw_cors:
+        for origin in raw_cors.split(","):
+            origin = origin.strip()
+            if not origin:
+                continue
+            if origin == "*":
+                errors.append("CORS_ALLOWED_ORIGINS: wildcard not allowed")
+            elif environment == "prod" and not origin.startswith("https://"):
+                errors.append("CORS_ALLOWED_ORIGINS: prod origins must be https")
+            else:
+                origins.append(origin)
+
     if errors:
         raise ConfigError(errors)
 
@@ -190,6 +206,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         max_ai_calls_per_day=max_calls,
         llm_api_key=llm_api_key,
         llm_model=llm_model,
+        cors_allowed_origins=tuple(origins),
     )
 
 
