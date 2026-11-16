@@ -83,8 +83,8 @@ class RagPipelineAdapter:
         )
         try:
             result = self._pipeline.handle(request)
-        except Exception:
-            return NoopPipeline().run(**kwargs)
+        except Exception as exc:
+            return {**NoopPipeline().run(**kwargs), "debug_reason": f"exception:{type(exc).__name__}"}
 
         if result.status == "accepted" and result.text:
             return {
@@ -103,6 +103,7 @@ class RagPipelineAdapter:
             "answer": result.text
             or "I don't have enough verified lesson evidence to answer that yet.",
             "validation_id": "val_" + request.request_id,
+            "debug_reason": f"{result.status}:{result.reason}",
         }
 
 
