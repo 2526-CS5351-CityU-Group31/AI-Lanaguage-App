@@ -1,0 +1,164 @@
+{
+  "entries": [
+    {
+      "entry_id": "a1-travel-001",
+      "word": "ticket",
+      "sense": "travel document",
+      "level": "A1",
+      "topic": "travel",
+      "definition": "A piece of paper that shows you have paid to travel.",
+      "example": "I bought a train ticket.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "a1-travel-002",
+      "word": "hotel",
+      "sense": "accommodation",
+      "level": "A1",
+      "topic": "travel",
+      "definition": "A place where you pay to sleep when travelling.",
+      "example": "We stayed in a small hotel.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "a1-food-001",
+      "word": "apple",
+      "sense": "fruit",
+      "level": "A1",
+      "topic": "food",
+      "definition": "A round red or green fruit.",
+      "example": "She ate an apple for lunch.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "a1-food-002",
+      "word": "bread",
+      "sense": "food",
+      "level": "A1",
+      "topic": "food",
+      "definition": "A common food made from flour and baked.",
+      "example": "I like bread with butter.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "a2-travel-001",
+      "word": "luggage",
+      "sense": "bags",
+      "level": "A2",
+      "topic": "travel",
+      "definition": "The bags you take with you when you travel.",
+      "example": "Please keep your luggage with you.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "a2-travel-002",
+      "word": "departure",
+      "sense": "leaving",
+      "level": "A2",
+      "topic": "travel",
+      "definition": "The act of leaving a place, especially to start a journey.",
+      "example": "Our departure is at 9 a.m.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "a2-work-001",
+      "word": "colleague",
+      "sense": "coworker",
+      "level": "A2",
+      "topic": "work",
+      "definition": "A person you work with.",
+      "example": "My colleague helped me with the report.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "a2-food-001",
+      "word": "recipe",
+      "sense": "instructions",
+      "level": "A2",
+      "topic": "food",
+      "definition": "Instructions for cooking a dish.",
+      "example": "She shared her pasta recipe.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "b1-travel-001",
+      "word": "itinerary",
+      "sense": "travel plan",
+      "level": "B1",
+      "topic": "travel",
+      "definition": "A detailed plan of a journey.",
+      "example": "The itinerary includes three cities.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "b1-work-001",
+      "word": "deadline",
+      "sense": "time limit",
+      "level": "B1",
+      "topic": "work",
+      "definition": "The latest time by which something must be done.",
+      "example": "We must meet the deadline.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "b1-education-001",
+      "word": "research",
+      "sense": "study",
+      "level": "B1",
+      "topic": "education",
+      "definition": "Careful study to discover new facts.",
+      "example": "She is doing research on climate.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "b1-environment-001",
+      "word": "pollution",
+      "sense": "contamination",
+      "level": "B1",
+      "topic": "environment",
+      "definition": "Damage to air, water or land by harmful substances.",
+      "example": "Air pollution is a big problem.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "b2-travel-001",
+      "word": "reimbursement",
+      "sense": "repayment",
+      "level": "B2",
+      "topic": "travel",
+      "definition": "Money paid back to you for expenses you incurred.",
+      "example": "You can claim reimbursement for travel costs.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "b2-work-001",
+      "word": "delegate",
+      "sense": "assign",
+      "level": "B2",
+      "topic": "work",
+      "definition": "To give a task or responsibility to someone else.",
+      "example": "Good managers delegate effectively.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "b2-education-001",
+      "word": "hypothesis",
+      "sense": "proposed explanation",
+      "level": "B2",
+      "topic": "education",
+      "definition": "An idea suggested as an explanation, to be tested.",
+      "example": "The hypothesis was supported by data.",
+      "review_status": "published"
+    },
+    {
+      "entry_id": "draft-001",
+      "word": "secretword",
+      "sense": "x",
+      "level": "A1",
+      "topic": "travel",
+      "definition": "Should never be served.",
+      "example": "n/a",
+      "review_status": "draft"
+    }
+  ]
+}

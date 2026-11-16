@@ -450,6 +450,25 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
             )
         except AuthenticationError as exc:
             return JSONResponse(status_code=exc.status_code, content={"error": exc.reason})
+
+        # ADR-008 / INV-PROG-001: persist learning events for accepted turns only.
+        # Scope rejections (scope_status != accepted) make no state change.
+        if result.get("scope_status") == "accepted":
+            progress = request.app.state.progress_service
+            progress.record_event(
+                user_id=principal.user_id,
+                event_type="session_started",
+                payload={"session_id": session_id, "topic": body.topic,
+                         "learner_mode": body.learner_mode.value},
+                idempotency_key=f"{session_id}:started",
+            )
+            progress.record_event(
+                user_id=principal.user_id,
+                event_type="turn_completed",
+                payload={"session_id": session_id, "topic": body.topic,
+                         "task": result.get("task")},
+                idempotency_key=f"{session_id}:{body.request_id}",
+            )
         return JSONResponse(status_code=200, content=result)
 
     return app

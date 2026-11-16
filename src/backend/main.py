@@ -21,26 +21,51 @@ from src.backend.db.repositories import InMemoryStores
 logger = logging.getLogger(__name__)
 
 
+def _attach_vocabulary_loader(stores):
+    """Load the verified vocabulary dataset onto the stores if it exists.
+
+    Implements: FR-VOC-001 (published-only seeded selection); ADR-007 (the
+    dataset is a read-only artifact). A missing file leaves ``loader`` as None,
+    so /vocabulary/random degrades to 503 rather than crashing.
+    """
+    import os
+
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "content", "vocabulary_en.json")
+    path = os.path.abspath(path)
+    try:
+        from src.backend.vocabulary.loader import VocabularyLoader
+
+        if os.path.exists(path):
+            stores.loader = VocabularyLoader.from_json(path)
+            logger.info("vocabulary dataset loaded from %s", path)
+        else:
+            logger.warning("vocabulary dataset not found at %s", path)
+    except Exception as exc:  # pragma: no cover - environment dependent
+        logger.warning("failed to load vocabulary dataset: %s", exc)
+    return stores
+
+
 def build_stores(database_url: str | None):
     """Build production stores over PostgreSQL, falling back to in-memory.
 
-    Implements: ADR-011 (Render managed Postgres); ADR-009; INV-SEC-001
+    Implements: ADR-011 (Render managed Postgres); ADR-009; INV-SEC-001;
+      FR-VOC-001 (attach the vocabulary dataset)
     The DSN must be the ``app_runtime`` role so corpus writes are denied. If a
     pool cannot be opened (driver missing or DB unreachable), the app degrades
     to in-memory stores and logs a warning rather than crashing at import time
     (RP-011 readiness still reports the DB state via /ready).
     """
     if not database_url:
-        return InMemoryStores()
+        return _attach_vocabulary_loader(InMemoryStores())
     try:
         from src.backend.db.repositories import PostgresStores, make_pool
 
         pool = make_pool(database_url)
         logger.info("database pool opened (PostgreSQL stores active)")
-        return PostgresStores(pool)
+        return _attach_vocabulary_loader(PostgresStores(pool))
     except Exception as exc:  # pragma: no cover - environment dependent
         logger.warning("database unavailable, using in-memory stores: %s", exc)
-        return InMemoryStores()
+        return _attach_vocabulary_loader(InMemoryStores())
 
 
 @dataclass(frozen=True)

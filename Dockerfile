@@ -22,6 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application source. Only what the server needs at runtime.
 COPY src ./src
+# Copy the read-only content corpus (vocabulary dataset; ADR-007 / FR-VOC-001).
+COPY content ./content
 
 # Run as a non-root user (defence in depth; Render also runs unprivileged).
 RUN useradd --create-home --uid 10001 appuser \
