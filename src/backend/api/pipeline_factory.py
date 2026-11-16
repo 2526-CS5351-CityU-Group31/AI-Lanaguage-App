@@ -141,13 +141,15 @@ def _build_rag_request(*, request_id, task, message, requires_grounding, topic, 
     )
 
 
-def build_pipeline_factory(api_key: str | None = None, level: str = "A2"):
+def build_pipeline_factory(api_key: str | None = None, level: str = "A2", retrieval_service=None):
     """Return a zero-arg callable producing the best available pipeline.
 
     Implements: FR-CHAT-001; RP-004 (safe fallback); S5 (no env read here - the
-    caller passes ``api_key`` from the config module).
+    caller passes ``api_key``/``retrieval_service`` from the composition root).
     Returns a factory for ``RagPipelineAdapter`` when ``api_key`` is set and the
     real modules import cleanly, otherwise a factory for ``NoopPipeline``.
+    ``retrieval_service`` (a VectorClient) is used for grounded retrieval when
+    provided; otherwise an empty shim abstains cleanly.
     """
     api_key = (api_key or "").strip()
     if not api_key:
@@ -165,12 +167,13 @@ def build_pipeline_factory(api_key: str | None = None, level: str = "A2"):
         from backend.config import ProviderGatewayConfig
         from backend.safety_boundary.citation_validator import CitationValidator
 
+        retrieval = retrieval_service or _EmptyRetrievalService()
         gateway = CityUModelGateway(
             config=ProviderGatewayConfig(api_key=api_key),
             transport=UrllibHttpTransport(),
         )
         pipeline = RagPipeline(
-            retrieval=RetrievalAdapter(_EmptyRetrievalService()),
+            retrieval=RetrievalAdapter(retrieval),
             assembler=PromptAssembler(),
             tutor=Tutor(gateway),
             validator=CitationValidator(),

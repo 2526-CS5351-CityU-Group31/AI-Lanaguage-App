@@ -57,6 +57,7 @@ class Config:
     context_token_budget: int = 1500
     compaction_message_limit: int = 6
     max_ai_calls_per_day: int = 50
+    rate_limit_per_minute: int = 60
     llm_api_key: str | None = None
     llm_model: str | None = None
     cors_allowed_origins: tuple[str, ...] = ()
@@ -186,6 +187,13 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         if parsed_calls is not None:
             max_calls = parsed_calls
 
+    rate_limit = 60
+    raw_rate = _get(env, "RATE_LIMIT_PER_MINUTE")
+    if raw_rate is not None:
+        parsed_rate = _parse_int(raw_rate, "RATE_LIMIT_PER_MINUTE", 1, 600, errors)
+        if parsed_rate is not None:
+            rate_limit = parsed_rate
+
     # CORS_ALLOWED_ORIGINS: comma list. In prod, entries must be exact https
     # origins, EXCEPT loopback dev origins (http://localhost / http://127.0.0.1,
     # any port) which are allowed so a locally-run frontend can call prod.
@@ -220,6 +228,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         context_token_budget=budget,
         compaction_message_limit=compaction,
         max_ai_calls_per_day=max_calls,
+        rate_limit_per_minute=rate_limit,
         llm_api_key=llm_api_key,
         llm_model=llm_model,
         cors_allowed_origins=tuple(origins),

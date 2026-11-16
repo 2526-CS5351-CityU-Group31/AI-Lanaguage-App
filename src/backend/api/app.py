@@ -258,6 +258,44 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
     app.state.vocabulary_service = VocabularyService(entry.stores)
     app.state.progress_service = ProgressService(entry.stores)
     app.state.scope_guard = ScopeGuard()
+
+    # Rate limiting (RP-008 / configuration-governance RATE_LIMIT_PER_MINUTE).
+    # Simple in-memory sliding window keyed by bearer token (or client host).
+    # Health/readiness and CORS preflight are exempt. Not for multi-instance
+    # correctness (per-process), which is acceptable for R1 on a single service.
+    _rate_limit = 60
+    try:
+        from src.backend.config import load_config as _lc_rate
+
+        _rate_limit = _lc_rate().rate_limit_per_minute
+    except Exception:
+        _rate_limit = 60
+
+    import time as _time
+    from collections import deque as _deque
+
+    _hits: dict[str, "_deque[float]"] = {}
+
+    @app.middleware("http")
+    async def _rate_limit_mw(request: Request, call_next):
+        path = request.url.path
+        if path in ("/health", "/ready") or request.method == "OPTIONS":
+            return await call_next(request)
+        auth = request.headers.get("authorization", "")
+        key = auth if auth else (request.client.host if request.client else "anon")
+        now = _time.monotonic()
+        window = _hits.setdefault(key, _deque())
+        while window and now - window[0] > 60.0:
+            window.popleft()
+        if len(window) >= _rate_limit:
+            return JSONResponse(
+                status_code=429,
+                content={"error": "rate limit exceeded; try again later"},
+                headers={"Retry-After": "60"},
+            )
+        window.append(now)
+        return await call_next(request)
+
     # Read the LLM key from the config boundary (S5): only config reads env.
     _api_key = None
     try:
@@ -266,10 +304,20 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         _api_key = load_config().llm_api_key
     except Exception:
         _api_key = None
+    # Grounded retrieval: use the read-only VectorClient when a PG pool exists.
+    _retrieval = None
+    _pool = getattr(entry.stores, "_pool", None)
+    if _pool is not None:
+        try:
+            from src.backend.database.vector_client import VectorClient
+
+            _retrieval = VectorClient(_pool)
+        except Exception:
+            _retrieval = None
     app.state.chat_router = ChatRouter(
         security=entry.security,
         scope_guard=app.state.scope_guard,
-        pipeline_factory=build_pipeline_factory(api_key=_api_key),
+        pipeline_factory=build_pipeline_factory(api_key=_api_key, retrieval_service=_retrieval),
     )
 
     @app.get("/health")
