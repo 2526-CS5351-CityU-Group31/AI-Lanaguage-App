@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=./ai-use-log-schema.json
 sessions:
   - session_id: "SES-001"
     date: "2026-11-02"
@@ -363,3 +364,19 @@ sessions:
       - "src/backend/contracts/models.py"
       - "src/backend/db/repositories.py"
     human_interventions: "Human switched the Render service DATABASE_URL to the internal app_runtime DSN (INV-SEC-001/INV-PROG-001 enforced at runtime), confirmed the redeploy of 6a1c801 is live, and signed off the handover. Agent resolved the SES-023 collision by renumbering the Kapo entry to SES-026 and fixed the handover reference, then confirmed all 14 Kapo requirements have non-stub code and the chat contract passes a 14/14 smoke test. Deferred to others: offline test suite (Luming/QA), real RagPipeline wiring + CitationValidator + writing_feedback task (Leon/AI), and content/vocabulary_en.json (content owner)."
+  - session_id: "SES-032"
+    date: "2026-11-16"
+    member: "Kapo"
+    branch: "backend"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Live-LLM bring-up, CORS, rate limiting, and read-only retrieval: fixed CityU 400 (JSON directive), added CORS middleware, added per-token/IP rate limiting, added read-only VectorClient, and verified the full stack live on Render."
+    files_touched:
+      - "src/backend/api/pipeline_factory.py"
+      - "src/backend/api/app.py"
+      - "src/backend/config.py"
+      - "src/backend/database/__init__.py"
+      - "src/backend/database/vector_client.py"
+      - "src/backend/main.py"
+      - "content/vocabulary_en.json"
+      - "Dockerfile"
+    human_interventions: "Human diagnosed the CityU HTTP 400 via temporary /debug/llm and diag scripts (valid key/model confirmed), verified the loopback-CORS boot crash, and directed all fixes. Agent added the 'JSON' directive to the pipeline prompt (CityU json_object requires the literal word 'json'), added CORSMiddleware driven by CORS_ALLOWED_ORIGINS (loopback http origins allowed in prod, wildcard/external-http rejected), added an in-memory sliding-window rate limiter (RATE_LIMIT_PER_MINUTE, 429 + Retry-After, health/ready exempt), and added src/backend/database/vector_client.py (SELECT-only pgvector RetrievalService, INV-SEC-001) wired into the pipeline factory. Removed both temporary debug hooks (/debug/llm and debug_reason). Verified live on Render (commit 46dfac3): real conversation answers, CORS preflight for localhost:5173, rate limiting returns 429, grounded lesson_help still abstains until content_chunks are ingested (corpus ingestion handed to AI/RAG + DB lanes; scripts/ingest_content.py still unimplemented). 176 offline tests pass."
