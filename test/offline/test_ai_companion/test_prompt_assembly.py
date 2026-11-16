@@ -214,7 +214,7 @@ def test_invalid_history_role_rejected() -> None:
 
 
 def test_module_has_no_provider_or_db_imports() -> None:
-    """ADR-006: the assembler depends only on the standard library."""
+    """ADR-006 / S4: the assembler depends only on stdlib and typed contracts."""
     tree = ast.parse(inspect.getsource(prompt_assembly_module))
     imported_roots: set[str] = set()
     for node in ast.walk(tree):
@@ -225,11 +225,14 @@ def test_module_has_no_provider_or_db_imports() -> None:
 
     assert imported_roots <= {
         "__future__",
+        "backend",
         "dataclasses",
         "difflib",
         "enum",
         "math",
+        "pathlib",
         "re",
+        "types",
         "typing",
         "unicodedata",
     }

@@ -50,6 +50,7 @@ class TutorRequest:
     prompt: str
     task: TaskType
     schema_id: str
+    temperature: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,7 @@ class Tutor:
             schema_id=request.schema_id,
             timeout_ms=self._config.timeout_ms,
             max_output_tokens=self._config.max_output_tokens,
+            temperature=request.temperature,
         )
 
         last_error: ModelGatewayError | None = None
@@ -129,6 +131,8 @@ class Tutor:
             raise InvalidRequestError("prompt must be non-empty")
         if not request.schema_id.strip():
             raise InvalidRequestError("schema_id must be non-empty")
+        if not 0.0 <= request.temperature <= 1.0:
+            raise InvalidRequestError("temperature must be between 0.0 and 1.0")
 
     def _validate_response(self, response: object) -> None:
         if not isinstance(response, ModelResponse):
