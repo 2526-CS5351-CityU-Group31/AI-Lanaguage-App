@@ -22,6 +22,8 @@
 | L-012 | 2026-10-27 | incident | No incidents have occurred; the project has no runtime. This row is a placeholder for the first incident review and is not evidence of safety. | Repository state at baseline; no deployment | none |
 | L-013 | 2026-11-02 | structural | The documentation set was re-aligned to the SSOT registry (31 requirements, 13 invariants, 18 modules). Prior rows L-002/L-003/L-004/L-005/L-009/L-011 describe the earlier 39-requirement / 11-invariant / 8k-token baseline and are retained unchanged as history, per the append-only rule (any `REQ-LANG-*` / numeric `INV-###` in them is historical, not current). | `requirements.yaml` count 31; `invariants.md` 13; `structural-constraints.md` 18 modules; ADR-006 1,500-token budget | `invariants.md`, `trace-matrix.md`, `structural-constraints.md`, `verification-constraints.md`, ADR-001/005/006/007/008/009/010, `runtime-policy-catalog.md`, `risk-list.md`, `option-ledger.md`, `memory-design.md` |
 
+| L-014 | 2026-11-15 | SEM evaluation | EVAL-1.0.0 now exists with 8 cases: the 2 active offline cases are measured on every PR (citation validity `eq 1.0`, prompt tokens `lte 1500`), while 3 offline and 3 live cases stay `pending`, so **0 live measurement has run** and the §4 release thresholds remain targets, not results. | `python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline` -> 2 passed, 0 failed, 3 pending, exit 0; evidence `reports/eval/offline-EVAL-1.0.0-*.json`; `pytest test/offline -q` -> 210 passed | `evals/EVAL-1.0.0.yaml`; `scripts/run_eval.py`; `.github/workflows/ci.yml` Gate 4; `debt-register.md` DBT-001 |
+
 ## 2. Threshold relaxations
 
 **None.** No threshold in `requirements.yaml` has been relaxed, and no row is needed under the rule "every relaxed threshold has a logbook row". If a threshold is relaxed later, the row must state the old value, the new value, the evidence and the risk that was accepted.
@@ -33,7 +35,7 @@
 | candidate review | L-001, L-004 | Documentation evidence only; no runtime benchmark |
 | structural | L-002, L-003, L-007, L-009, L-010, L-011, L-013 | Counts and arithmetic, reproducible from the files |
 | guardrail test | L-005, L-010 | Static coverage only; no failing test exists yet |
-| SEM evaluation | L-006 | Targets adopted; no measured value |
+| SEM evaluation | L-006, L-014 | Targets adopted; offline tier measures 2 of 8 cases; no live value |
 | incident | L-012 | No incident; placeholder |
 | prompt change | L-008 | Version declared; prompt file absent |
 

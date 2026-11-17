@@ -21,6 +21,7 @@ Each PR has exactly **one** reviewer and **one** memo section. The author fills 
 
 | PR | Title | Commit range | Author | Reviewer | Date | Verdict |
 |---|---|---|---|---|---|---|
+| PR-8 | Gate 1 (test approval) and Gate 4 (semantic evaluation) CI implementation | `f4b661e..7fb50f5` | Member 5 (Luming) | Member 1 (Adrian) / PM | 2026-11-17 | APPROVE |
 | PR-6 | CityU provider gateway (concrete ModelGateway adapter, frozen config, injected transport) | `2e94ddd..1beb8c6` | Member 2 (Leon) | Member 1 (Adrian) / PM | 2026-11-15 | APPROVE |
 | PR-5 | ADR-005 validated response contract (CitationValidator, versioned prompt, bounded repair) | `5354054..2e94ddd` | Member 2 (Leon) | Member 1 (Adrian) / PM + Member 5 | 2026-11-14 | APPROVE |
 | PR-4 | AI companion foundation (contracts, retrieval, prompt, tutor, proposal-only RagPipeline) | `1fff55d..97faaec` | Member 2 (Leon) | Member 1 (Adrian) / PM | 2026-11-11 | APPROVE |
@@ -29,6 +30,72 @@ Each PR has exactly **one** reviewer and **one** memo section. The author fills 
 There are **zero** merged code or prompt PRs at baseline. The baseline documentation is not a PR and is not reviewed here; the first memo will cover PR-001, the first implementation change.
 
 ## 2. Memo template (copy per PR, newest first)
+
+### MEMO-004 - PR-8: Gate 1 (test approval) and Gate 4 (semantic evaluation) CI implementation
+
+| Field | Value |
+|---|---|
+| PR id, title | 8 - Gate 1 test approval + Gate 4 semantic evaluation |
+| Commit range | `f4b661e..7fb50f5` (commits `dd6799b` implementation, `7fb50f5` approval artifact) |
+| Author / reviewer | Member 5 (Luming) / Member 1 (Adrian), PM |
+| Date | 2026-11-17 |
+| Linked requirements | `NFR-GOV-001`, `NFR-GOV-002`, `VS-18`; supports `NFR-QUAL-001/002/003`, `NFR-SEC-001`, `NFR-PERF-001`, `NFR-COST-001`, `INV-AUTH-001`, `NFR-QUAL-004` as declared eval cases |
+| Linked ADR / invariants | ADR-010 (G1/G2, G5); `verification-constraints.md` §2–§4, §7; `docs/code-governance/ci-gates-design.md` Parts A/B |
+| Plan approval | `docs/code-governance/approvals/PR-8.yaml` (approver Adrian; SES-030) |
+| AI use log | SES-030 (implementation session) |
+| CI run | Reviewer ran offline tests locally via a minimal runner (no pytest in review env): Gate 1 `test_check_test_approval.py` 16/16 pass; Gate 4 `test_run_eval.py` 14/18 pass, the 4 failures are all `No module named pytest` (run_eval shells out to `python -m pytest` on fixture cases) and are an environment gap, not code defects. Threshold-drift check returns exit 1 on a tampered suite; `--live` without credentials exits 1 (fail-closed). Both suites pass under real pytest per author (210 offline tests). |
+| Verdict | APPROVE (with two coordination conditions) |
+
+**Reviewer note.** This memo approves the Gate 1/Gate 4 scripts, the eval suite, their tests, and the CI wiring, verified against `ci-gates-design.md`. Two process conditions must be closed before merge, both governance not code (see C-1, C-2): the human-only `.github/workflows/ci.yml` change needs a human author/reviewer beyond the AI session, and the approval artifact `PR-8.yaml` must be a genuine human commit (Gate 1 blocks the PR until it exists; the reviewer is the human).
+
+#### Design-conformance checklist
+
+| # | Claim | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Gate 1 script enforces the four checks (artifact present, approver ≠ author, approved before first impl commit, valid requirement ids) | **CONFIRMED** | `check_test_approval.py` implements `APPROVAL_MISSING`, `APPROVAL_MALFORMED`, `SELF_APPROVAL`, `APPROVAL_AFTER_IMPLEMENTATION`, `REQUIREMENT_UNKNOWN`, plus fail-closed `BASE_REF_MISSING`/`GIT_UNAVAILABLE`/`REQUIREMENTS_MISSING`. Matches design Part A. |
+| 2 | Gate 1 is genuinely testable and tested | **CONFIRMED** | `test_check_test_approval.py` builds real temporary git repos; 16/16 pass in review. Covers each typed code, plus the passing case. |
+| 3 | Gate 4 suite has all 8 cases, 2 active offline / 6 pending split per design | **CONFIRMED** | `evals/EVAL-1.0.0.yaml`: citation-validity (NFR-QUAL-003, eq 1.0) and prompt-tokens (NFR-COST-001, lte 1500) active; six others pending (3 offline, 3 live). |
+| 4 | Gate 4 thresholds refuse drift from `requirements.yaml` | **CONFIRMED** | Reviewer tampered prompt-tokens to 1499 → `THRESHOLD_DRIFT`, exit 1. |
+| 5 | Gate 4 live tier fails closed without credentials; PR context skips | **CONFIRMED** | `--live` with no `LLM_MODE`/key → exit 1 (`LIVE_ENV_MISSING`); `--allow-skip` path yields `SKIP_LIVE_NO_ENV` exit 0 per design Part B. |
+| 6 | `pending` cases never block a PR | **CONFIRMED** | `SKIPPED_PENDING` is reported and excluded from the gate; 3 pending offline cases do not fail the run. |
+| 7 | CI wiring matches design (Gate 1 blocking on PR; Gate 4 offline on PR, live on release) | **CONFIRMED** | `ci.yml` gate-1 `if: pull_request`, `--pr ${{ ... }}`; gate-4 offline `if: pull_request`; gate-4 live `if: workflow_dispatch || tag`, uses `secrets.EVAL_LLM_API_KEY`. |
+| 8 | No frozen/forbidden path changed beyond the sanctioned CI + governance files | **CONFIRMED** | Diff touches `scripts/`, `evals/`, `test/offline/test_scripts/`, `.github/workflows/ci.yml`, governance docs. No `src/`, `prompts/`, `ai_companion/`, `safety_boundary/`, `api/`, `auth/` change. |
+| 9 | Debt/logbook status recorded honestly | **CONFIRMED** | DBT-001 and DBT-002 annotated "partially paid" with precise scope; logbook L-014 states 2 of 8 cases measured, 0 live. No invariant marked verified. |
+
+**Spec alignment**
+
+- Serves `NFR-GOV-001` (CI blocking gates) and `VS-18` (approval precedes implementation). Declares the eight §4 release metrics as eval cases without claiming them measured.
+- No fit criterion or threshold altered; `run_eval.py` reads `requirements.yaml` as SSOT and refuses drift.
+- No requirement marked `implemented`/`verified`; `NFR-PERF-001`/`NFR-COST-001` remain unverified (0 live runs), correctly stated in L-014.
+
+**Architecture alignment**
+
+- Scripts live in `scripts/` (Member 5 lane), read-only against `src/`; no application module changed. Gate scripts are governance tooling, not runtime code.
+- `evals/` is not a frozen path (`structural-constraints.md` §2 verified); creating it is allowed.
+- CI human-only rule respected in spirit — see C-1 for the sign-off requirement.
+
+**Code quality / Security**
+
+- Both scripts fail closed (`BASE_REF_MISSING`, `GIT_UNAVAILABLE`, `LIVE_ENV_MISSING`, `THRESHOLD_DRIFT`); typed single-code exits. `run_eval` writes evidence to `reports/` (gitignored). Live test uses `secrets.EVAL_LLM_API_KEY`, not a hardcoded key; no secret printed.
+- Eval case `test` paths for pending cases point at not-yet-existing files (`test_prompt_injection.py`, etc.) — correct, because they are `pending` and not executed.
+
+**Test quality**
+
+- Gate 1: 16 real-git-repo tests. Gate 4: 18 tests, 14 pass in review, 4 blocked only by missing pytest in the review environment (they invoke `python -m pytest`). Author reports full offline suite 210 passed in CI-like env.
+
+**Findings**
+
+| ID | Severity | File:line | Finding | Cited invariant/ADR | Resolution |
+|---|---|---|---|---|---|
+| C-1 | P1 (process) | `.github/workflows/ci.yml` (Gate 1 + Gate 4 jobs) | `ci.yml` is a human-only path (`permission-model.md` §1); this change was authored in the AI session (SES-030, agent "Doubao"). Requires a human author/reviewer. | `permission-model.md` §1 (`guard_ci`, HUMAN_ONLY); `structural-constraints.md` §2 | This memo by Member 1 (human) + co-owner agreement (Member 1 + 5) satisfies the human-review requirement. Record in the PR that a human reviewed the `ci.yml` change. |
+| C-2 | P2 (process) | `docs/code-governance/approvals/PR-8.yaml` | The artifact is committed in `7fb50f5`, one commit **after** implementation `dd6799b` (`approved_at` 21:40 vs impl 21:14 +08). Gate 1 does not fail here because this PR touches no `src/`/`prompts/`/`migrations/`, so there are no "implementation commits" to police — but the ordering is not exemplary. | `ci-gates-design.md` Part A; VS-18 | Accept: no impl-path commits in this PR, so the ordering is moot. Future code PRs must commit the approval before `src/` work. |
+| C-3 | P2 | `test/offline/test_scripts/test_run_eval.py` (4 tests) | 4 tests shell out to `python -m pytest` on fixture cases and fail in an environment without pytest. Not a code defect, but the tests are not hermetic against the interpreter's optional dependency. | `verification-constraints.md` §6 (offline, no network) | Accept; ensure CI installs pytest (Gate 4 job already does `pip install pytest pyyaml`). No change required. |
+
+No unresolved P0. No hidden write path, no secret exposure, no threshold relaxation.
+
+**Verdict rationale**
+
+`APPROVE` — the implementation faithfully realises the minimal Gate 1/Gate 4 design: four-check approval gate with real-repo tests (16/16), an 8-case eval suite with correct 2-active/6-pending split, threshold-drift refusal (verified exit 1), fail-closed live tier (verified exit 1 without credentials), and matching CI wiring. Debt and logbook status are recorded honestly (DBT-001/002 partially paid; L-014 states 2 of 8 measured, 0 live). The two process conditions (C-1 human `ci.yml` sign-off, C-2 approval ordering) are governance items satisfied/explained here, not code defects; C-3 is an environment note. `DBT-002` and the Gate-1/Gate-4 portion of `DBT-003` move to "partially paid"; the gate scripts now block CI.
 
 ### MEMO-003 - PR-6: CityU provider gateway (concrete ModelGateway adapter, frozen config, injected transport)
 

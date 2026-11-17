@@ -3,15 +3,17 @@ name: CI Blocking Gates
 on:
   push:
     branches: [main, master]
+    tags: ["*"]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 jobs:
 
-  # Gate 1: Test Approval.
-  # Placeholder: check_test_approval.py is not implemented yet (DBT-002). The
-  # approval artifact location/format is not specified in the docs, so this gate
-  # does not block until that is confirmed.
+  # Gate 1: Test Approval. A PR may not carry implementation commits written before
+  # a named human approved the plan and its tests. The human commits
+  # docs/code-governance/approvals/PR-<number>.yaml before coding (ci-gates-design.md
+  # A.1) and this job proves the order (VS-18).
   gate-1-test-approval:
     name: "Gate 1: Test Approval"
     runs-on: ubuntu-latest
@@ -19,10 +21,18 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-      - name: Test Approval (placeholder, non-blocking)
-        run: |
-          echo "Placeholder: check_test_approval.py not implemented yet (DBT-002)."
-          echo "Approval artifact location pending confirmation; this gate does not block."
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Gate Dependencies
+        run: pip install pyyaml
+      - name: Fetch Base Branch
+        run: git fetch --no-tags origin "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+      - name: Check Test Approval
+        run: python scripts/check_test_approval.py --pr ${{ github.event.pull_request.number }} --base origin/${{ github.base_ref }}
 
   # Gate 2: Static Analysis.
   # Type checking and a syntax compile run on every commit. The extra
@@ -67,19 +77,58 @@ jobs:
       - name: Validate Requirements Registry
         run: python scripts/validate_req.py docs/req/requirements.yaml
 
-  # Gate 4: Semantic Evaluation.
-  # Placeholder: run_eval.py is not implemented yet (DBT-001), so this gate does
-  # not block until the fixed evaluation set and thresholds are wired.
+  # Gate 4: Semantic Evaluation. The suite (evals/EVAL-1.0.0.yaml) carries two active
+  # offline cases; `pending` metrics are reported and never block a PR. The live tier
+  # runs at release only and fails closed when credentials or measurements are missing
+  # (ci-gates-design.md B.1-B.4).
   gate-4-semantic-evaluation:
-    name: "Gate 4: Semantic Evaluation"
+    name: "Gate 4: Semantic Evaluation (offline)"
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-      - name: Semantic Evaluation (placeholder, non-blocking)
-        run: |
-          echo "Placeholder: run_eval.py not implemented yet (DBT-001); this gate does not block."
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Evaluation Dependencies
+        run: pip install pytest pyyaml
+      - name: Run Offline Semantic Evaluation
+        run: python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --offline
+      - name: Upload Offline Evaluation Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-evidence-offline
+          path: reports/eval/
+          retention-days: 90
+
+  gate-4-live-semantic-evaluation:
+    name: "Gate 4: Semantic Evaluation (live, release)"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Evaluation Dependencies
+        run: pip install pytest pyyaml
+      - name: Run Live Semantic Evaluation
+        env:
+          LLM_MODE: live
+          LLM_API_KEY: ${{ secrets.EVAL_LLM_API_KEY }}
+        run: python scripts/run_eval.py --suite evals/EVAL-1.0.0.yaml --live
+      - name: Upload Live Evaluation Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-evidence-live
+          path: reports/eval/
+          retention-days: 90
 
   # Gate 5: Regression Gate. Runs the full deterministic offline suite.
   gate-5-regression:
