@@ -109,6 +109,24 @@ class RagPipelineAdapter:
 def _build_rag_request(*, request_id, task, message, requires_grounding, topic, level):
     from backend.ai_companion.rag_pipeline import RagRequest  # lazy: backend.* tree
 
+    # The response schema is task-specific: a conversation-shaped schema makes
+    # the model return task=conversation for lesson_help, which the validator
+    # rejects (FR-RAG-001 / ADR-005).
+    response_schemas = {
+        "conversation": (
+            'Respond with a JSON object matching this schema: '
+            '{"task": "conversation", "abstained": false, "source_ids": [], '
+            '"answer": "string", "follow_up": "string", "tips": ["string"]}'
+        ),
+        "lesson_help": (
+            'Respond with a JSON object matching this schema: '
+            '{"task": "lesson_help", "abstained": false, '
+            '"source_ids": ["chunk_id from evidence"], '
+            '"answer": "string", "follow_up": "string", "tips": ["string"]}'
+        ),
+    }
+    response_schema = response_schemas.get(task, response_schemas["conversation"])
+
     return RagRequest(
         request_id=request_id,
         task=task,
@@ -120,13 +138,11 @@ def _build_rag_request(*, request_id, task, message, requires_grounding, topic, 
         standing_constraints=(
             "Only help with English language learning. Never invent lesson "
             "citations. Keep answers short and level-appropriate. "
-            "Respond with a single valid JSON object only, no prose outside it."
+            "For lesson_help, cite at least one chunk_id from the evidence in "
+            "source_ids. Respond with a single valid JSON object only, no "
+            "prose outside it."
         ),
-        response_schema=(
-            'Respond with a JSON object matching this schema: '
-            '{"task": "conversation", "abstained": false, "source_ids": [], '
-            '"answer": "string", "follow_up": "string"}'
-        ),
+        response_schema=response_schema,
         schema_id=f"{task}_v1",
         learner_profile=f"CEFR level {level}; target language English.",
         resumable_state="",

@@ -385,7 +385,7 @@ sessions:
     member: "Leon"
     branch: "backend"
     agent: "opencode (CS5351/DeepSeek-V4-Flash)"
-    purpose: "FR-CORP-001 content ingestion and live grounded-retrieval bring-up: add the offline ingest command, author and review the A2 corpus manifest, ingest 18 published chunks, and fix a provider-text Unicode defect that made lesson_help abstain on the live service."
+    purpose: "FR-CORP-001 content ingestion and live grounded-retrieval bring-up: add the offline ingest command, author and review the A2 corpus manifest, ingest 18 published chunks, and fix the live lesson_help abstention (conversation-shaped response schema for lesson_help, plus provider-text Unicode hardening)."
     files_touched:
       - "scripts/ingest_content.py"
       - "content/manifest.yaml"
@@ -393,5 +393,8 @@ sessions:
       - "test/offline/test_scripts/test_ingestion.py"
       - "src/backend/ai_companion/provider_gateway.py"
       - "test/offline/test_ai_companion/test_provider_gateway.py"
+      - "src/backend/api/pipeline_factory.py"
+      - "test/offline/test_api/conftest.py"
+      - "test/offline/test_api/test_pipeline_factory.py"
       - "docs/code-governance/ai-use-log.yaml"
-    human_interventions: "Human approved the six A2 lessons for publication and directed the Phase 1 corpus authoring, the live ingest, and the live verification. Agent implemented scripts/ingest_content.py (validate, chunk, optional 1536-dim embeddings, transactional write, audit, retire path, dry-run review of drafts), wrote 21 offline tests, authored the 6-source/18-chunk A2 manifest, ingested it against Render (6 published sources, 18 chunks, 6 audit rows), and diagnosed the live lesson_help abstention as a UnicodeEncodeError in validation hashing caused by a lone UTF-16 surrogate in provider text. Agent added provider-boundary sanitization (U+FFFD) and a regression test; 198 offline tests pass. The live redeploy and lesson_help re-check remain pending at the time of this entry."
+    human_interventions: "Human approved the six A2 lessons for publication and directed the Phase 1 corpus authoring, the live ingest, and the live verification. Agent implemented scripts/ingest_content.py (validate, chunk, optional 1536-dim embeddings, transactional write, audit, retire path, dry-run review of drafts), wrote 21 offline tests, authored the 6-source/18-chunk A2 manifest, and ingested it against Render (6 published sources, 18 chunks, 6 audit rows). Agent reproduced the live lesson_help abstention with the exact pipeline_factory request builder: it sent a conversation-shaped response schema for lesson_help, so the model returned task=conversation and the validator rejected it. Agent made the schema task-specific and added a regression test; it also hardened the provider boundary against lone UTF-16 surrogates that crashed validation hashing. The pipeline_factory change is in Kapo's api lane and is flagged for his review. 200 offline tests pass. The live redeploy and lesson_help re-check remain pending at the time of this entry."
