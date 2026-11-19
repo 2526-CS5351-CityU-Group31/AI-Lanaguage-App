@@ -1,15 +1,19 @@
 # A2 lesson corpus for the AI Companion demo.
 #
-# REVIEW GATE (ADR-007): every source is "draft" until a human reviewer has
-# read it. Review the dry-run report, then change the reviewed sources to
-# "published" and re-run the ingest. Drafts are chunked for review but never
+# REVIEW GATE (ADR-007): new sources start as "draft" until a human reviewer
+# has read them. Review the dry-run report, then change the reviewed sources
+# to "published" and re-run the ingest. Drafts are chunked for review but never
 # written to content_chunks and never served.
+#
+# STATUS (2026-11-19): the six sources below were reviewed and published, then
+# ingested to Render as 18 chunks (201-238 tokens each).
 #
 #   python scripts/ingest_content.py --manifest content/manifest.yaml --dry-run \
 #       --report reports/ingest-plan.json
 #
-# Runtime retrieval currently matches level A2 exactly and topic exactly when
-# supplied. Keep topic values lowercase.
+# Runtime retrieval matches level A2 exactly and topic exactly when supplied,
+# then ranks the matching chunks by title-weighted lexical overlap. Keep topic
+# values lowercase.
 version: 1
 sources:
   - source_id: "a2-grammar-present-simple"
