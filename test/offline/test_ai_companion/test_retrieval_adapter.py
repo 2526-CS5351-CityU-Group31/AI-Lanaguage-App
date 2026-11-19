@@ -83,6 +83,37 @@ def test_top_k_score_threshold_and_dedupe() -> None:
     assert "c3" not in result.published_ids
 
 
+def test_lexical_overlap_ranks_relevant_chunk_first() -> None:
+    """FR-RAG-001 / ADR-007: query overlap ranks relevant published evidence first."""
+    service = FakeRetrievalService(
+        chunks=(
+            make_chunk(
+                "a-articles",
+                text="Use a before a consonant sound.",
+                score=1.0,
+            ),
+            make_chunk(
+                "b-present",
+                text="The present simple describes habits.",
+                score=1.0,
+            ),
+            make_chunk(
+                "c-travel",
+                text="Turn left at the station.",
+                score=1.0,
+            ),
+        )
+    )
+    adapter = RetrievalAdapter(service)
+
+    result = adapter.retrieve(make_query(query="Explain the present simple", top_k=2))
+
+    assert [chunk.chunk_id for chunk in result.chunks] == [
+        "b-present",
+        "a-articles",
+    ]
+
+
 def test_empty_candidates_return_empty_evidence() -> None:
     """ADR-007: an empty retrieval result is a valid EvidenceSet, not an exception."""
     adapter = RetrievalAdapter(FakeRetrievalService())

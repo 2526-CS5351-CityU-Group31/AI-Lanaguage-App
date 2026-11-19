@@ -1,13 +1,19 @@
 """RetrievalAdapter - conditional, published-only retrieval over an injected port.
 
 Element: RetrievalAdapter
-Implements: ADR-007 §Decision/§Ingestion flow step 4; INV-SCOPE-006.
+Implements: ADR-007 §Decision/§Ingestion flow step 4; INV-SCOPE-006;
+FR-RAG-001 (deterministic lexical ranking over the candidate window).
+
+Ranking is lexical overlap over the candidates returned by the RetrievalService,
+with the provider score as the tie-breaker. A larger corpus needs ranking in SQL
+or an embedding adapter (NFR-QUAL-001); this keeps the current 18-chunk corpus
+deterministic without a provider call.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from typing import Sequence
 
 from backend.contracts.ai_companion import (
     CEFR_LEVELS,
@@ -22,6 +28,53 @@ from backend.contracts.ai_companion import (
     RetrievalService,
     RetrievalUnavailableError,
 )
+
+
+_TERM_PATTERN = re.compile(r"[a-z0-9']+")
+_STOPWORDS = frozenset(
+    {
+        "a", "about", "am", "an", "and", "are", "as", "at", "be", "been",
+        "being", "between", "but", "by", "can", "correct", "correction",
+        "could", "definition", "did", "difference", "do", "does", "english",
+        "example", "examples", "explain", "for", "from", "grammar", "had",
+        "has", "have", "he", "her", "him", "his", "how", "i", "if", "in",
+        "is", "it", "its", "language", "learn", "learning", "lesson", "mean",
+        "meaning", "me", "my", "no", "not", "of", "on", "or", "our",
+        "practice", "practise", "please", "rule", "she", "should", "so",
+        "tell", "than", "that", "the", "their", "them", "then", "there",
+        "these", "they", "this", "those", "to", "usage", "us", "was", "we",
+        "were", "what", "when", "where", "which", "who", "why", "will",
+        "with", "would", "yes", "you", "your",
+    }
+)
+
+
+def _query_terms(query: str) -> frozenset[str]:
+    """Return the content terms of a query (FR-RAG-001)."""
+    return frozenset(
+        term
+        for term in _TERM_PATTERN.findall(query.lower())
+        if term not in _STOPWORDS
+    )
+
+
+def _lexical_score(query_terms: frozenset[str], chunk: RetrievedChunk) -> float:
+    """Return a weighted lexical overlap score (FR-RAG-001).
+
+    A title match is stronger evidence than a body match: "Present Simple"
+    must outrank a past-simple chunk that merely mentions "present perfect".
+    """
+    if not query_terms:
+        return 0.0
+    title_terms = set(_TERM_PATTERN.findall(chunk.title.lower()))
+    all_terms = set(
+        _TERM_PATTERN.findall(
+            f"{chunk.title} {chunk.section} {chunk.text}".lower()
+        )
+    )
+    title_score = len(query_terms & title_terms) / len(query_terms)
+    text_score = len(query_terms & all_terms) / len(query_terms)
+    return 3.0 * title_score + text_score
 
 
 @dataclass(frozen=True)
@@ -85,18 +138,23 @@ class RetrievalAdapter:
             )
         )
 
-        best_by_id: dict[str, RetrievedChunk] = {}
+        query_terms = _query_terms(query.query)
+        best_by_id: dict[str, tuple[RetrievedChunk, float]] = {}
         for chunk in published:
+            lexical = _lexical_score(query_terms, chunk)
             existing = best_by_id.get(chunk.chunk_id)
-            if existing is None or chunk.score > existing.score:
-                best_by_id[chunk.chunk_id] = chunk
+            if existing is None or (chunk.score, lexical) > (
+                existing[0].score,
+                existing[1],
+            ):
+                best_by_id[chunk.chunk_id] = (chunk, lexical)
 
-        ordered: Sequence[RetrievedChunk] = sorted(
+        ordered = sorted(
             best_by_id.values(),
-            key=lambda chunk: (-chunk.score, chunk.chunk_id),
+            key=lambda item: (-item[1], -item[0].score, item[0].chunk_id),
         )
         return EvidenceSet(
-            chunks=tuple(ordered[: query.top_k]),
+            chunks=tuple(chunk for chunk, _ in ordered[: query.top_k]),
             withheld_ids=withheld_ids,
         )
 
