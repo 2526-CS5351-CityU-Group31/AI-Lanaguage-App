@@ -1,0 +1,37 @@
+# TEMPLATE ONLY - this file is not ingested.
+#
+# Copy it to content/manifest.yaml, replace the example with human-reviewed
+# lesson text, then validate before writing anything:
+#
+#   python scripts/ingest_content.py --manifest content/manifest.yaml --dry-run
+#
+# Field notes
+#   review_status : published | draft | retired
+#                   Only published chunks are served; draft/retired sources
+#                   have their old chunks deleted in the same transaction.
+#   level         : A1 | A2 | B1 | B2 (runtime retrieval currently matches A2)
+#   topic         : optional; retrieval matches it exactly when supplied
+#   sections[].text : inline lesson text (UTF-8)
+#   sections[].path : UTF-8 file relative to this manifest's directory
+#
+# Omitting a source does not delete it. To remove content from the corpus, keep
+# the source entry and set review_status: retired.
+version: 1
+sources: []
+
+# Example (uncomment, replace the text, then remove the [] above):
+#
+# sources:
+#   - source_id: "a2-grammar-present-simple"
+#     title: "Present Simple"
+#     language: "en"
+#     level: "A2"
+#     topic: "grammar"
+#     review_status: "draft"      # draft until a human reviews the text
+#     sections:
+#       - section: "Form"
+#         text: |
+#           The present simple uses the base verb for I, you, we and they.
+#           For he, she and it, add -s or -es to the verb.
+#       - section: "Use"
+#         path: "lessons/present-simple-use.md"

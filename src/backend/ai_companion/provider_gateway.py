@@ -11,8 +11,10 @@ measured), INV-CITE-001 (support: the gateway never validates or repairs model
 output).
 
 The gateway makes exactly one HTTP attempt per ``complete`` call. ``Tutor`` is
-the sole retry authority. Provider text is returned unchanged so the existing
-``CitationValidator`` remains the only acceptance gate.
+the sole retry authority. Provider text is returned unchanged except for lone
+UTF-16 surrogates, which cannot be encoded as UTF-8 and are replaced with
+U+FFFD at this transport boundary. The existing ``CitationValidator`` remains
+the only acceptance gate.
 """
 
 from __future__ import annotations
@@ -312,6 +314,7 @@ class CityUModelGateway:
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
             return None
+        content = _sanitize_provider_text(content)
 
         model_value = payload_map.get("model")
         model_id = (
@@ -388,6 +391,20 @@ def _as_string_mapping(value: object) -> dict[str, object] | None:
             return None
         result[key] = item
     return result
+
+
+def _sanitize_provider_text(text: str) -> str:
+    """Replace lone UTF-16 surrogates with U+FFFD.
+
+    Implements: ADR-005 (the validator must receive UTF-8 representable text);
+    INV-CITE-001 (acceptance remains downstream). A lone surrogate cannot be
+    encoded as UTF-8 and would otherwise crash validation hashing.
+    """
+    if not any(0xD800 <= ord(char) <= 0xDFFF for char in text):
+        return text
+    return "".join(
+        "\ufffd" if 0xD800 <= ord(char) <= 0xDFFF else char for char in text
+    )
 
 
 def _token_count(value: object) -> int | None:

@@ -299,6 +299,26 @@ def test_provider_text_is_returned_unchanged() -> None:
     assert result.text == content
 
 
+def test_lone_surrogate_is_replaced_before_validation() -> None:
+    """ADR-005 / INV-CITE-001: provider text is UTF-8 safe before the gate runs."""
+    content = "Use a " + "\ud83d" + " before a consonant."
+    transport = FakeHttpTransport(
+        responses=[
+            ProviderHttpResponse(
+                status_code=200,
+                body=provider_body(content),
+            )
+        ]
+    )
+
+    result = make_gateway(transport).complete(make_request())
+
+    assert result.text == "Use a \ufffd before a consonant."
+    assert result.text.encode("utf-8") == (
+        b"Use a \xef\xbf\xbd before a consonant."
+    )
+
+
 @pytest.mark.parametrize(
     "usage",
     [

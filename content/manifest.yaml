@@ -1,0 +1,331 @@
+# A2 lesson corpus for the AI Companion demo.
+#
+# REVIEW GATE (ADR-007): every source is "draft" until a human reviewer has
+# read it. Review the dry-run report, then change the reviewed sources to
+# "published" and re-run the ingest. Drafts are chunked for review but never
+# written to content_chunks and never served.
+#
+#   python scripts/ingest_content.py --manifest content/manifest.yaml --dry-run \
+#       --report reports/ingest-plan.json
+#
+# Runtime retrieval currently matches level A2 exactly and topic exactly when
+# supplied. Keep topic values lowercase.
+version: 1
+sources:
+  - source_id: "a2-grammar-present-simple"
+    title: "Present Simple"
+    language: "en"
+    level: "A2"
+    topic: "grammar"
+    review_status: "published"
+    sections:
+      - section: "Form"
+        text: |
+          The present simple uses the base form of the verb with I, you, we and
+          they. For example, I work, you study, we live and they play. With he,
+          she and it, add -s or -es to the verb. For example, he works, she
+          studies and it rains. Verbs that end in -s, -sh, -ch, -x or -o take
+          -es: he watches, she goes. A verb that ends in a consonant plus -y
+          changes to -ies: study becomes studies, and carry becomes carries.
+          Questions use do or does before the subject. For example, do you like
+          coffee? Does she live here? Negative sentences use do not or does
+          not. For example, I do not work on Sunday. He does not eat meat. In
+          speaking, do not often becomes don't and does not becomes doesn't.
+          The verb be is different: I am, you are, he is, she is, it is, we are
+          and they are. For example, I am a student and she is a teacher.
+      - section: "Use"
+        text: |
+          The present simple describes habits and routines. For example, I
+          brush my teeth every morning. It also describes facts that are
+          generally true. The sun rises in the east. Water boils at one hundred
+          degrees. We use it for timetables and schedules. The train leaves at
+          eight o'clock. The shop opens at nine. Adverbs of frequency often
+          appear with the present simple: always, usually, often, sometimes and
+          never. They go before the main verb but after the verb be. For
+          example, I usually walk to work. She is never late. Time expressions
+          such as every day, once a week and on Mondays are also common. We
+          also use the present simple to give instructions and directions. For
+          example, you turn left at the bank and walk for five minutes. It can
+          also express feelings and opinions that are generally true: I like
+          music and she enjoys reading.
+      - section: "Common mistakes"
+        text: |
+          Learners often forget the -s with he, she and it. Say she works, not
+          she work. Do not add -s to the verb after does. Say does he work, not
+          does he works. Use do with I, you, we and they, and does with he, she
+          and it. Another common mistake is using the present simple for
+          actions happening now. Use the present continuous for that: I am
+          eating now, not I eat now. Finally, put adverbs of frequency in the
+          right place. Say I always drink tea, not I drink always tea. Remember
+          that the verb be does not use do or does in the present simple. Say
+          she is happy, not she does be happy. Also check the spelling of the
+          -s form: watch becomes watches, study becomes studies and go becomes
+          goes. Read your sentence aloud and listen for the final sound. A
+          final check is to ask a friend to listen and correct you.
+
+  - source_id: "a2-grammar-present-continuous"
+    title: "Present Continuous"
+    language: "en"
+    level: "A2"
+    topic: "grammar"
+    review_status: "published"
+    sections:
+      - section: "Form"
+        text: |
+          The present continuous is formed with am, is or are plus the -ing
+          form of the verb. Use am with I, is with he, she and it, and are with
+          you, we and they. For example, I am reading, she is cooking and they
+          are playing. To make a negative sentence, put not after am, is or
+          are. For example, I am not working and they are not listening. In
+          speaking, am not becomes I'm not, is not becomes isn't and are not
+          becomes aren't. To ask a question, put am, is or are before the
+          subject. For example, are you listening? Is he working? What are they
+          doing? The -ing form is made by adding -ing to the base verb. For
+          verbs ending in a silent e, drop the e: write becomes writing. For
+          most verbs, simply add -ing: read becomes reading and play becomes
+          playing. For verbs ending in a consonant plus a vowel plus a
+          consonant, double the final consonant: sit becomes sitting and run
+          becomes running.
+      - section: "Use"
+        text: |
+          Use the present continuous for actions happening now, at the moment
+          of speaking. For example, please be quiet because the baby is
+          sleeping. It is also used for temporary situations. I am staying with
+          my aunt this week. We use it for definite future plans. We are
+          meeting our teacher tomorrow at ten. Time expressions such as now,
+          right now, at the moment and today are common. Some verbs are not
+          usually used in the continuous form, especially verbs about thinking,
+          liking or owning: know, like, want, need, believe and have when it
+          means possession. Say I know the answer, not I am knowing the answer.
+          We can also use the present continuous to describe a situation that
+          is changing. For example, the weather is getting colder and more
+          people are working from home. It can show that something is temporary
+          or different from usual.
+      - section: "Present simple vs continuous"
+        text: |
+          The present simple describes habits, routines and general facts. The
+          present continuous describes actions happening now or around now.
+          Compare these two sentences. I work in a bank every day. I am working
+          from home today. The first sentence describes a routine. The second
+          describes a temporary situation. Another example: she usually walks
+          to school, but today she is taking the bus. Signal words help you
+          choose. Look for every day, usually and never for the present simple.
+          Look for now, at the moment and today for the present continuous. If
+          you are not sure, ask whether the action is a habit or something
+          temporary. Some time expressions can appear with both forms, so the
+          meaning of the sentence is the best guide. For example, today can
+          describe a temporary situation, as in I am working from home today.
+
+  - source_id: "a2-grammar-past-simple"
+    title: "Past Simple"
+    language: "en"
+    level: "A2"
+    topic: "grammar"
+    review_status: "published"
+    sections:
+      - section: "Form"
+        text: |
+          Regular past simple verbs end in -ed. For example, work becomes
+          worked, play becomes played and study becomes studied. Irregular
+          verbs have their own forms and must be learned. For example, go
+          becomes went, see becomes saw, eat becomes ate and have becomes had.
+          The past simple form is the same for all subjects. We say I went, you
+          went, she went and they went. Negative sentences use did not plus the
+          base verb. For example, I did not go and she did not eat. Questions
+          use did before the subject and the base verb. For example, did you
+          go? Did he see the film? In speaking, did not usually becomes didn't.
+          The verb be is irregular in the past: I was, you were, he was, she
+          was, it was, we were and they were. For example, I was tired and they
+          were at home. Questions with be do not use did: was she at work
+          yesterday?
+      - section: "Use"
+        text: |
+          The past simple describes completed actions in the past. We often say
+          when the action happened. For example, I visited my grandmother last
+          weekend. She started her job in 2020. It is also used for a series of
+          completed events. He woke up, ate breakfast and left the house. Time
+          expressions such as yesterday, last week, two days ago and in 2019
+          are common with the past simple. The past simple is not used for
+          actions that are still true now. Use the present simple for those. For
+          example, say I live in Hong Kong, not I lived in Hong Kong, if you
+          still live there. The finished time is the key signal. The past simple
+          is common in stories and reports. We use it to describe the main
+          events in order. For example, we arrived at the hotel, checked in and
+          went to our room. The present perfect is different because it
+          connects the past to now.
+      - section: "Common mistakes"
+        text: |
+          Learners often use the past tense after did. Say did you go, not did
+          you went. The verb after did is always the base form. Another common
+          mistake is adding -ed to an irregular verb. Say went, not goed, and
+          saw, not seed. Some learners use the past simple when they need the
+          present perfect. Use the past simple when the time is finished, for
+          example yesterday. Use the present perfect when the time is not
+          finished or the exact time is not important, for example I have
+          visited Singapore. Also remember that the past of read is pronounced
+          like red, although it is spelled read. Do not use the past simple with
+          time expressions that include now or today when the action is still
+          true. For example, say I am busy today, not I was busy today, if today
+          is not finished. Check the time expression before you choose the
+          tense.
+
+  - source_id: "a2-grammar-articles"
+    title: "Articles: a, an and the"
+    language: "en"
+    level: "A2"
+    topic: "grammar"
+    review_status: "published"
+    sections:
+      - section: "A and an"
+        text: |
+          Use a before a singular countable noun that starts with a consonant
+          sound. For example, a book, a teacher and a university. Use an before
+          a singular countable noun that starts with a vowel sound. For
+          example, an apple, an hour and an engineer. The choice depends on the
+          sound, not the letter. University starts with a consonant sound, so
+          we say a university. Hour starts with a vowel sound, so we say an
+          hour. We use a or an when we introduce something for the first time.
+          For example, I saw a dog in the park. The dog was very friendly. Use
+          a or an for jobs: she is a doctor. Do not use a or an with plural
+          nouns or uncountable nouns. We also use a or an in exclamations with
+          singular countable nouns: what a lovely day! She is such a good
+          teacher. Remember that the article comes before the adjective, not
+          after it.
+      - section: "The"
+        text: |
+          Use the when both the speaker and the listener know which person or
+          thing we mean. For example, please close the door. We both know which
+          door. Use the when something has already been mentioned. I bought a
+          coat. The coat was expensive. Use the with unique things: the sun,
+          the moon and the sky. Use the with superlatives: the best, the
+          tallest and the most interesting. Use the with rivers, seas, oceans
+          and groups of islands: the Nile, the Pacific and the Philippines. Do
+          not use the for most countries, cities, streets or languages. Say I
+          live in Hong Kong, not in the Hong Kong. Say she speaks English, not
+          the English. Use the with musical instruments when you talk about
+          playing them: she plays the piano. Use the with families: the Smiths
+          are coming to dinner. Do not use the with names of people or most
+          single mountains and lakes.
+      - section: "No article"
+        text: |
+          Do not use an article with plural nouns when you talk about them in
+          general. For example, cats are popular pets. Do not use an article
+          with uncountable nouns when you talk about them in general. Water is
+          important for life. Do not use an article before meals, sports,
+          school, work, home or bed when they are used in their usual sense. For
+          example, I go to school by bus. She is at home. We have breakfast at
+          seven. However, use the when you mean a specific place or thing. For
+          example, the school near my house is old. The breakfast at this hotel
+          is good. The same noun can take an article or no article depending on
+          the meaning. Use no article with languages and school subjects when
+          you talk about them in general. For example, I study English and
+          mathematics. Use no article with most countries, cities and
+          continents: Japan, Paris and Asia. Add the when the name includes a
+          plural or a common noun, such as the United States or the United
+          Kingdom.
+
+  - source_id: "a2-travel-directions"
+    title: "Travel English: Asking for Directions"
+    language: "en"
+    level: "A2"
+    topic: "travel"
+    review_status: "published"
+    sections:
+      - section: "Asking politely"
+        text: |
+          When you ask for directions, start politely. Excuse me, could you
+          tell me how to get to the train station? You can also say, excuse me,
+          where is the nearest bus stop? If you are lost, say, I'm sorry, I
+          think I'm lost. Can you help me? Use could or would to be polite. For
+          example, could you show me on the map? Would you mind repeating that
+          more slowly? It is useful to ask the person to speak slowly if you do
+          not understand. Say, I'm sorry, I didn't catch that. Could you say it
+          again? Always thank the person at the end. Thank you very much for
+          your help. It is also useful to ask the person to point or to show you
+          on a map. Say, could you point to it on the map? If you do not
+          understand the answer, ask a second question politely. Say, sorry, do
+          you mean this street? Repeat the important words to check.
+      - section: "Giving directions"
+        text: |
+          When you give directions, use clear and short sentences. Go straight
+          ahead for about two hundred metres. Turn left at the traffic lights.
+          Turn right after the bank. The station is on your left. It is next to
+          the supermarket. It is opposite the post office. It is between the
+          cafe and the bookshop. Use landmarks to help the person. For example,
+          you will see a large park on your right. Walk past the park and take
+          the second street on the left. If the place is far, say it is about
+          ten minutes on foot. You can also suggest a bus: take bus number
+          seven and get off at the museum. Use your hand to point when you
+          speak, because gestures help. If there are several ways to go, give
+          the easiest one. Say, the easiest way is to walk along this road. If
+          you are not sure, say, I'm not sure, but I think it is that way. It is
+          better to be honest than to give wrong directions.
+      - section: "Useful phrases"
+        text: |
+          Here are some useful phrases for travel. Is it far from here? How
+          long does it take to get there? Can I walk there? Where can I buy a
+          ticket? Which platform does the train leave from? Does this bus go to
+          the airport? Could you write it down, please? I need to go to this
+          address. These phrases are polite and easy to use. Practise them in
+          short dialogues. For example, ask a stranger for the station, listen
+          to the answer, and repeat the key words to check. Say, so I go
+          straight and turn left at the lights? This helps you confirm that you
+          understood the directions. When you buy a ticket, you can say, one
+          ticket to the city centre, please. Ask about the price: how much is
+          it? Ask about the time: what time does the next train leave? If you
+          need help, say, could you help me with this machine? These short
+          phrases are useful in many travel situations.
+
+  - source_id: "a2-work-email-requests"
+    title: "Work English: Email Requests"
+    language: "en"
+    level: "A2"
+    topic: "work"
+    review_status: "published"
+    sections:
+      - section: "Polite requests"
+        text: |
+          In a work email, polite requests are important. Use could you or
+          would you mind followed by the -ing form. For example, could you send
+          me the report by Friday? Would you mind checking these figures? Use
+          please to make the request softer. For example, please send me the
+          updated schedule. If you need something urgently, say so clearly but
+          politely. For example, I need this information by three o'clock
+          today. Could you let me know if that is possible? Avoid direct
+          commands such as send me the file. They can sound rude in English.
+          Add a reason to help the reader understand: I need the file to
+          prepare for the meeting. Use I would like to for a softer request
+          about something you need. For example, I would like to arrange a
+          meeting for next week. Use I am afraid to introduce a small problem
+          politely: I am afraid I cannot attend on Monday.
+      - section: "Opening and closing"
+        text: |
+          Start a work email with a clear greeting. Use Dear Mr Lee or Dear Ms
+          Chan if you know the person's name. Use Hello team or Hi Anna in less
+          formal companies. Say why you are writing in the first sentence. For
+          example, I am writing to ask about the new project. I am writing to
+          confirm our meeting on Monday. End with a clear next step. For
+          example, please let me know if you have any questions. I look forward
+          to hearing from you. Close with Best regards or Kind regards in a
+          formal email. Use Thanks or Best in a friendly email. Always check
+          the name and the date before you send. If you do not know the person's
+          name, use Dear Sir or Madam in a formal email. If you know the team
+          but not the person, use Dear Team. In a follow-up email, remind the
+          reader of the earlier message: I am writing to follow up on my email
+          from Monday. Keep the greeting and closing consistent with the
+          company style.
+      - section: "Common mistakes"
+        text: |
+          Learners often translate requests directly from their first language.
+          In English, a direct command can sound impolite. Use could you or
+          would you mind instead. Do not write I want you to send me the file.
+          Write could you send me the file? Another common mistake is
+          forgetting please. Please is simple but important. Check the tone of
+          your email before you send it. Read it aloud. If it sounds like an
+          order, add a polite phrase. Also check that the subject line is
+          clear. A subject such as Report for Friday is better than Hello.
+          Finally, keep the email short and focus on one main request. Check the
+          difference between could you and can you. Both are polite, but could
+          you is softer in a formal email. Avoid many exclamation marks and
+          capital letters, because they can sound angry. A calm, clear email is
+          easier to answer.
