@@ -21,11 +21,20 @@ python3 test/smoke_test/run_smoke_test.py
 
 # Against a local server (e.g. `python -m src.backend.main` on port 8000):
 python3 test/smoke_test/run_smoke_test.py --base-url http://127.0.0.1:8000
+
+# Also verify rate limiting (HTTP 429 + Retry-After) as an extra final step:
+python3 test/smoke_test/run_smoke_test.py --test-rate-limit
 ```
 
 Output is an aligned pass/fail table with HTTP status and latency per check.
 The script exits `0` if every check passes, `1` otherwise. It never prints
 passwords or session tokens, and it creates a throwaway user each run.
+
+> `--test-rate-limit` is **off by default**. When enabled it runs **last**, after
+> logout, and sends a rapid burst from a **fresh throwaway token** (its own
+> per-token rate bucket), so it cannot lock out the primary smoke run or other
+> clients. It passes only if the server returns **HTTP 429 with a `Retry-After`
+> header**. Expect this step to take several seconds.
 
 > Render Free instances sleep when idle — the first request may take ~30-50s
 > (cold start). The script's timeout (120s) accommodates this.
@@ -49,6 +58,9 @@ passwords or session tokens, and it creates a throwaway user each run.
    - off-topic "Write a Python script to scrape a website" → 200,
      `scope_status=rejected` (scope guard blocks non-language-learning input).
 6. **Logout** — `POST /auth/logout` succeeds; the old token then gets 401.
+7. **Rate limiting (optional, `--test-rate-limit`)** — after logout, a rapid
+   burst from a throwaway token must yield **HTTP 429 + `Retry-After`**. Off by
+   default; runs last so normal runs are never rate-limited.
 
 ## Notes
 

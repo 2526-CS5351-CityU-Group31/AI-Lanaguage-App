@@ -88,8 +88,14 @@ def _request(
     return status, resp_headers, parsed, latency_ms
 
 
-def run(base_url: str) -> list[Result]:
-    """Run every lifecycle check and return the collected results."""
+def run(base_url: str, *, test_rate_limit: bool = False) -> list[Result]:
+    """Run every lifecycle check and return the collected results.
+
+    When ``test_rate_limit`` is True, a final burst step runs after logout to
+    verify HTTP 429 + Retry-After. It uses a FRESH throwaway token so the burst
+    is keyed to its own per-token bucket and cannot lock out normal runs or the
+    primary smoke user. It is off by default.
+    """
     results: list[Result] = []
     base = base_url.rstrip("/")
     email = f"smoke_{uuid.uuid4().hex[:12]}@example.com"
@@ -250,6 +256,38 @@ def run(base_url: str) -> list[Result]:
     st, _, _, ms = _request("GET", f"{base}/me", token=token)
     record("GET /me after logout -> 401", st == 401, st, ms)
 
+    # ---- 7. Optional rate-limit burst (last; off by default) -------------
+    if test_rate_limit:
+        # Fresh throwaway user -> its token is a separate rate-limit bucket, so
+        # the burst cannot affect the primary smoke user or other clients.
+        burst_email = f"rl_{uuid.uuid4().hex[:12]}@example.com"
+        st, _, rl_body, ms = _request(
+            "POST",
+            f"{base}/auth/register",
+            body={"email": burst_email, "password": password, "cefr_level": "A2", "language": "en"},
+        )
+        burst_token = rl_body.get("session_token", "") if isinstance(rl_body, dict) else ""
+        if not burst_token:
+            record("Rate limit 429 + Retry-After", False, st, ms, note="no burst token")
+        else:
+            target = f"{base}/me"  # authenticated, non-exempt endpoint
+            got_429 = False
+            retry_after = None
+            last_status = None
+            # Default server limit is 60/min; burst well past it (server may be
+            # configured lower). 80 requests guarantees the window overflows.
+            burst_started = time.monotonic()
+            for _ in range(80):
+                last_status, hdr, _, _ = _request("GET", target, token=burst_token)
+                if last_status == 429:
+                    got_429 = True
+                    retry_after = hdr.get("retry-after")
+                    break
+            burst_ms = (time.monotonic() - burst_started) * 1000.0
+            ok = got_429 and retry_after is not None
+            note = f"Retry-After={retry_after}" if retry_after else "429 not reached"
+            record("Rate limit 429 + Retry-After", ok, last_status, burst_ms, note=note)
+
     return results
 
 
@@ -276,11 +314,20 @@ def print_table(results: list[Result]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Live end-to-end smoke test for the backend API.")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="Server base URL")
+    parser.add_argument(
+        "--test-rate-limit",
+        action="store_true",
+        default=False,
+        help="Also verify rate limiting (HTTP 429 + Retry-After). Runs last; "
+        "sends a rapid burst from a throwaway token. Off by default.",
+    )
     args = parser.parse_args(argv)
 
     print(f"Smoke testing backend at: {args.base_url}")
+    if args.test_rate_limit:
+        print("Rate-limit burst enabled (runs last, isolated throwaway token).")
     try:
-        results = run(args.base_url)
+        results = run(args.base_url, test_rate_limit=args.test_rate_limit)
     except Exception as exc:  # pragma: no cover - network failure path
         print(f"SMOKE TEST ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
