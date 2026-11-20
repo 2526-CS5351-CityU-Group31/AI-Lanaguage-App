@@ -1,0 +1,10 @@
+pr: 8
+approver: "Adrian"
+approved_at: "2026-11-15T13:40:34Z"
+requirement_ids: ["NFR-GOV-001"]
+tests:
+  - name: "test/offline/test_scripts/test_check_test_approval.py::test_valid_approval_before_implementation_passes"
+    covers: "VS-18"
+  - name: "test/offline/test_scripts/test_run_eval.py::test_repository_suite_passes_offline"
+    covers: "NFR-GOV-001"
+rollback: "Revert the Gate 1/Gate 4 jobs in .github/workflows/ci.yml and delete scripts/check_test_approval.py, scripts/run_eval.py, evals/EVAL-1.0.0.yaml and the two test modules."
