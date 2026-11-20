@@ -311,6 +311,98 @@ def print_table(results: list[Result]) -> None:
     print()
 
 
+def run_security_checks(base_url: str) -> list[Result]:
+    """Run ONLY the 3 boundary/security checks (no full lifecycle, no burst).
+
+    Covers:
+      1. INV-AUTH-001 cross-user isolation (foreign session -> 403/404).
+      2. ScopeGuard uncertain branch (ambiguous prompt -> uncertain + message).
+      3. Disallowed CORS origin is not echoed in Access-Control-Allow-Origin.
+
+    Creates two throwaway users per run; prints no secrets.
+    """
+    results: list[Result] = []
+    base = base_url.rstrip("/")
+    password = "smoke-pass-123"
+
+    def record(name: str, ok: bool, status: object, latency_ms: float, note: str = "") -> None:
+        results.append(Result(name, ok, status, latency_ms, note))
+
+    # Register User A, create a session owned by A.
+    email_a = f"sec_a_{uuid.uuid4().hex[:10]}@example.com"
+    st, _, body, ms = _request(
+        "POST", f"{base}/auth/register",
+        body={"email": email_a, "password": password, "cefr_level": "A2", "language": "en"},
+    )
+    token_a = body.get("session_token", "") if isinstance(body, dict) else ""
+    st, _, body, ms = _request("POST", f"{base}/sessions", token=token_a)
+    session_a = body.get("session_id") if isinstance(body, dict) else None
+
+    # ---- 1. Cross-user isolation (INV-AUTH-001) --------------------------
+    email_b = f"sec_b_{uuid.uuid4().hex[:10]}@example.com"
+    st, _, body, ms = _request(
+        "POST", f"{base}/auth/register",
+        body={"email": email_b, "password": password, "cefr_level": "A2", "language": "en"},
+    )
+    token_b = body.get("session_token", "") if isinstance(body, dict) else ""
+    if session_a and token_b:
+        st, _, _, ms = _request(
+            "POST",
+            f"{base}/sessions/{session_a}/messages",
+            body={"learner_mode": "conversation_practice", "message": "Help me practise English", "request_id": "sec_xu"},
+            token=token_b,
+        )
+        record(
+            "Cross-user isolation (403/404)",
+            st in (403, 404),
+            st,
+            ms,
+            note="User B blocked from User A's session",
+        )
+    else:
+        record("Cross-user isolation (403/404)", False, "skip", 0.0, note="setup failed")
+
+    # ---- 2. ScopeGuard uncertain / clarification -------------------------
+    if session_a and token_a:
+        st, _, body, ms = _request(
+            "POST",
+            f"{base}/sessions/{session_a}/messages",
+            body={"learner_mode": "lesson_question", "message": "help", "request_id": "sec_unc"},
+            token=token_a,
+        )
+        ok = (
+            st == 200
+            and isinstance(body, dict)
+            and body.get("scope_status") == "uncertain"
+            and bool(body.get("scope_message"))
+        )
+        status_note = body.get("scope_status") if isinstance(body, dict) else "?"
+        record("ScopeGuard uncertain (clarification)", ok, st, ms, note=f"scope_status={status_note}")
+    else:
+        record("ScopeGuard uncertain (clarification)", False, "skip", 0.0, note="no session A")
+
+    # ---- 3. Disallowed CORS origin not echoed ----------------------------
+    st, hdr, _, ms = _request(
+        "OPTIONS",
+        f"{base}/sessions",
+        origin="https://evil-example.com",
+        extra_headers={
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    acao = hdr.get("access-control-allow-origin")
+    record(
+        "CORS rejects evil origin",
+        acao is None or acao != "https://evil-example.com",
+        st,
+        ms,
+        note=f"ACAO={acao}",
+    )
+
+    return results
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Live end-to-end smoke test for the backend API.")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="Server base URL")
@@ -321,13 +413,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Also verify rate limiting (HTTP 429 + Retry-After). Runs last; "
         "sends a rapid burst from a throwaway token. Off by default.",
     )
+    parser.add_argument(
+        "--security-only",
+        action="store_true",
+        default=False,
+        help="Run ONLY the 3 boundary/security checks (cross-user isolation, "
+        "ScopeGuard uncertain, disallowed CORS origin). Skips the full lifecycle.",
+    )
     args = parser.parse_args(argv)
 
     print(f"Smoke testing backend at: {args.base_url}")
     if args.test_rate_limit:
         print("Rate-limit burst enabled (runs last, isolated throwaway token).")
     try:
-        results = run(args.base_url, test_rate_limit=args.test_rate_limit)
+        if args.security_only:
+            results = run_security_checks(args.base_url)
+        else:
+            results = run(args.base_url, test_rate_limit=args.test_rate_limit)
     except Exception as exc:  # pragma: no cover - network failure path
         print(f"SMOKE TEST ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1

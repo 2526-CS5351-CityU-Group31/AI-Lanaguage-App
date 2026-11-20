@@ -24,6 +24,9 @@ python3 test/smoke_test/run_smoke_test.py --base-url http://127.0.0.1:8000
 
 # Also verify rate limiting (HTTP 429 + Retry-After) as an extra final step:
 python3 test/smoke_test/run_smoke_test.py --test-rate-limit
+
+# Run ONLY the 3 boundary/security checks (skips the full lifecycle):
+python3 test/smoke_test/run_smoke_test.py --security-only
 ```
 
 Output is an aligned pass/fail table with HTTP status and latency per check.
@@ -61,6 +64,19 @@ passwords or session tokens, and it creates a throwaway user each run.
 7. **Rate limiting (optional, `--test-rate-limit`)** — after logout, a rapid
    burst from a throwaway token must yield **HTTP 429 + `Retry-After`**. Off by
    default; runs last so normal runs are never rate-limited.
+
+### Boundary/security checks (`--security-only`)
+
+Run these alone with `--security-only` (also appended as extra checks at the end
+of a normal run). Each creates throwaway users and prints no secrets:
+
+- **Cross-user isolation (INV-AUTH-001)** — User B's token posting to User A's
+  `session_id` → **403/404** (access denied).
+- **ScopeGuard uncertain** — an ambiguous prompt (e.g. `"help"`) →
+  **`scope_status == "uncertain"`** with a non-empty `scope_message`.
+- **Disallowed CORS origin** — `OPTIONS /sessions` with
+  `Origin: https://evil-example.com` must **not** echo that origin in
+  `Access-Control-Allow-Origin`.
 
 ## Notes
 
