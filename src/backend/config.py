@@ -53,3 +53,4 @@ def load_provider_gateway_config() -> ProviderGatewayConfig:
             f"{LLM_API_KEY_ENV_VAR} is required for the CityU provider gateway"
         )
     return ProviderGatewayConfig(api_key=api_key)
+
