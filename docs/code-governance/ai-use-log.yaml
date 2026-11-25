@@ -460,3 +460,14 @@ sessions:
       - "docs/code-governance/ai-use-log.yaml"
     human_interventions: "Human asked for Gate 1 and Gate 4 to be finished in this session and chose a step-by-step review pace. Agent wrote both scripts, the suite, the tests and the artifact contract first, then the CI wiring, and verified the offline suite plus run_eval.py --offline (2 passed, 3 pending) and the live tier failing closed without credentials. The member field and the human-only .github/workflows/ci.yml change still need human confirmation and sign-off before merge; Gate 1 will also block the PR until a human commits docs/code-governance/approvals/PR-<number>.yaml."
 
+  - session_id: "SES-035"
+    date: "2026-11-25"
+    member: "Kapo"
+    branch: "copilot/fix-gate-2-static-analysis"
+    agent: "opencode (CS5351/DeepSeek-V4-Flash)"
+    purpose: "Repair the CI Blocking Gates on PR #11: install the project dependencies for Gate 2 and Gate 5, keep strict mypy green without a redundant type: ignore, and record the change in this log for Gate 6."
+    files_touched:
+      - "src/backend/db/repositories.py"
+      - ".github/workflows/ci.yml"
+      - "docs/code-governance/ai-use-log.yaml"
+    human_interventions: "Human reproduced both failing gates locally: installing only mypy reported 32 strict errors, and installing requirements.txt first reported 0. Human confirmed that MYPYPATH=src maps src/backend under both the src.* and backend.* module names and fails, so the workflow installs the dependencies instead. Human approved keeping the lazy import inside an else branch while type checkers import psycopg under TYPE_CHECKING, and approved the Gate 2 and Gate 5 pip install -r requirements.txt edits, which the human applies because .github/workflows/ is a frozen path. The regression suite passes for both the bare and the full environments (210 tests). Gate 1 still needs a named approver other than the PR author to commit docs/code-governance/approvals/PR-11.yaml. Verification: mypy --strict src reports 0 errors, pytest test/offline reports 210 passed, and scripts/check_ai_log.py passes."

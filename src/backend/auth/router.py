@@ -16,9 +16,11 @@ from __future__ import annotations
 from src.backend.api.schemas.profile import ProfileSchema
 from src.backend.auth.security import (
     AuthenticationError,
+    AuthSecurity,
     AuthorizationError,
 )
 from src.backend.contracts.models import Principal, Profile
+from src.backend.db.repositories import InMemoryStores, PostgresStores
 
 __all__ = [
     "AuthRouter",
@@ -48,7 +50,11 @@ class AuthRouter:
     Implements: FR-AUTH-001, FR-PROF-001; ADR-009
     """
 
-    def __init__(self, security: object, stores: object) -> None:
+    def __init__(
+        self,
+        security: AuthSecurity,
+        stores: InMemoryStores | PostgresStores,
+    ) -> None:
         self._security = security
         self._stores = stores
 

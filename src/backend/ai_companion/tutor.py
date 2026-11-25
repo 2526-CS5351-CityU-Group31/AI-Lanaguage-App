@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from backend.ai_companion.prompt_assembly import estimate_tokens
-from backend.contracts.ai_companion import (
+from .prompt_assembly import estimate_tokens
+from ..contracts.ai_companion import (
     InvalidRequestError,
     ModelGateway,
     ModelGatewayError,

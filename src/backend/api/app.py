@@ -14,6 +14,7 @@ multipart or file parameter anywhere in this module (INV-SEC-002).
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from typing import AsyncIterator, cast
 
 from fastapi import FastAPI, Header, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -21,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.backend.api.schemas.profile import ProfileValidationError
 from src.backend.api.routers.chat import ChatRouter
-from src.backend.contracts.models import LearnerMode
+from src.backend.contracts.models import LearnerMode, Principal
 from src.backend.auth.router import (
     AuthenticationError,
     AuthRouter,
@@ -41,7 +42,7 @@ class _NoopPipeline:
     Member 2). Makes no network call so offline runs stay deterministic.
     """
 
-    def run(self, **kwargs: object) -> dict:
+    def run(self, **kwargs: object) -> dict[str, object]:
         task = kwargs.get("task", "conversation")
         return {
             "task": task,
@@ -52,13 +53,14 @@ class _NoopPipeline:
         }
 
 
-def _principal_of(request: Request):
+def _principal_of(request: Request) -> Principal:
     """Resolve the caller's principal from the bearer token or raise 401."""
     authorization = request.headers.get("authorization")
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AuthenticationError("missing session")
     token = authorization.split(" ", 1)[1].strip()
-    principal = request.app.state.auth_router.resolve_principal(token)
+    auth_router = cast(AuthRouter, request.app.state.auth_router)
+    principal = auth_router.resolve_principal(token)
     if principal is None:
         raise AuthenticationError("invalid session")
     return principal
@@ -197,7 +199,7 @@ class ProfileResponse(BaseModel):
 
 def _auth_of(request: Request) -> AuthRouter:
     """Return the injected AuthRouter from application state."""
-    return request.app.state.auth_router
+    return cast(AuthRouter, request.app.state.auth_router)
 
 
 def _extract_bearer(authorization: str | None) -> str:
@@ -214,10 +216,12 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
       RP-011 (readiness reflects DB state); ADR-009
     """
     entry = create_entry()
-    auth_router = router or entry.auth
+    auth_router = router if router is not None else entry.auth
+    if auth_router is None:
+        raise RuntimeError("application auth router is not configured")
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         """Open resources on startup and close them on shutdown.
 
         Implements: ADR-011 (pool lifecycle); INV-PROG-001 (no partial writes);
@@ -244,6 +248,8 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
     app.state.vocabulary_service = VocabularyService(entry.stores)
     app.state.progress_service = ProgressService(entry.stores)
     app.state.scope_guard = ScopeGuard()
+    if entry.security is None:
+        raise RuntimeError("application security is not configured")
     app.state.chat_router = ChatRouter(
         security=entry.security,
         scope_guard=app.state.scope_guard,
@@ -255,8 +261,8 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         """Liveness probe (static 200). Implements: RP-011; ADR-011."""
         return {"status": "ok"}
 
-    @app.get("/ready")
-    def ready(request: Request):
+    @app.get("/ready", response_model=dict[str, str])
+    def ready(request: Request) -> dict[str, str] | JSONResponse:
         """Readiness probe reflecting database availability.
 
         Implements: RP-011 (503 when the store is unavailable); ADR-011
@@ -266,7 +272,10 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         return JSONResponse(status_code=503, content={"status": "database_unavailable"})
 
     @app.post("/auth/register", response_model=TokenResponse)
-    def register(body: RegisterRequest, request: Request) -> TokenResponse:
+    def register(
+        body: RegisterRequest,
+        request: Request,
+    ) -> TokenResponse | JSONResponse:
         """Implements: FR-AUTH-001; INV-LANG-001, INV-CEFR-001; RP-015."""
         auth = _auth_of(request)
         try:
@@ -283,7 +292,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         return TokenResponse(session_token=token)
 
     @app.post("/auth/login", response_model=TokenResponse)
-    def login(body: LoginRequest, request: Request) -> TokenResponse:
+    def login(body: LoginRequest, request: Request) -> TokenResponse | JSONResponse:
         """Implements: FR-AUTH-001; RP-012."""
         auth = _auth_of(request)
         try:
@@ -310,7 +319,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
     def get_me(
         request: Request,
         authorization: str | None = Header(default=None),
-    ) -> ProfileResponse:
+    ) -> ProfileResponse | JSONResponse:
         """Implements: FR-PROF-001; INV-AUTH-001."""
         auth = _auth_of(request)
         try:
@@ -327,7 +336,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         body: UpdateProfileRequest,
         request: Request,
         authorization: str | None = Header(default=None),
-    ) -> ProfileResponse:
+    ) -> ProfileResponse | JSONResponse:
         """Implements: FR-PROF-001; INV-CEFR-001; RP-015."""
         auth = _auth_of(request)
         try:
@@ -350,7 +359,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         count: int = 5,
         seed: int = 0,
         topic: str | None = None,
-    ) -> list[VocabularyCardResponse]:
+    ) -> list[VocabularyCardResponse] | JSONResponse:
         """Return seeded published vocabulary cards for a level.
 
         Implements: FR-VOC-001 (published-only; identical seed -> identical)
@@ -361,12 +370,12 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         cards = loader.select_random(level=level, count=count, seed=seed, topic=topic)
         return [VocabularyCardResponse(**card.__dict__) for card in cards]
 
-    @app.post("/me/vocabulary/{entry_id}")
+    @app.post("/me/vocabulary/{entry_id}", response_model=dict[str, str])
     def record_vocabulary(
         entry_id: str,
         body: FamiliarityRequest,
         request: Request,
-    ) -> dict[str, str]:
+    ) -> dict[str, str] | JSONResponse:
         """Record familiarity state for the owner and emit an event.
 
         Implements: FR-VOC-002; ADR-008; INV-AUTH-001 (owner-scoped)
@@ -383,7 +392,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         return {"user_id": record.user_id, "entry_id": record.entry_id, "state": record.state}
 
     @app.get("/me/progress", response_model=ProgressResponse)
-    def progress(request: Request) -> ProgressResponse:
+    def progress(request: Request) -> ProgressResponse | JSONResponse:
         """Aggregate dashboard totals from stored events for the owner.
 
         Implements: FR-DASH-001; INV-PROG-001 (never model-derived)
@@ -400,8 +409,8 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
             recent_topics=metrics.recent_topics,
         )
 
-    @app.post("/sessions")
-    def create_session(request: Request):
+    @app.post("/sessions", response_model=dict[str, str])
+    def create_session(request: Request) -> dict[str, str] | JSONResponse:
         """Create a server-generated chat session owned by the caller.
 
         Implements: FR-CHAT-001; ADR-009 (session belongs to the authenticated
@@ -417,12 +426,12 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         request.app.state.stores.chat_sessions.create(session_id, principal.user_id)
         return {"session_id": session_id}
 
-    @app.post("/sessions/{session_id}/messages")
+    @app.post("/sessions/{session_id}/messages", response_model=None)
     def post_message(
         session_id: str,
         body: MessageRequest,
         request: Request,
-    ):
+    ) -> JSONResponse:
         """Scope-guard the message, then (only if accepted) run the pipeline.
 
         Implements: INV-SCOPE-001, INV-SCOPE-003; FR-CHAT-001; ADR-009
@@ -437,7 +446,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         owner = request.app.state.stores.chat_sessions.owner_of(session_id)
         if owner is not None and owner != principal.user_id:
             return JSONResponse(status_code=404, content={})
-        authorization = request.headers.get("authorization")
+        authorization = request.headers.get("authorization", "")
         token = authorization.split(" ", 1)[1].strip()
         try:
             result = request.app.state.chat_router.handle_message(

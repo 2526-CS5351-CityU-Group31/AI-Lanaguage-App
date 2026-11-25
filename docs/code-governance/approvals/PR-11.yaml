@@ -1,0 +1,10 @@
+pr: 11
+approver: "Adrian"
+approved_at: "2026-11-25T01:30:00Z"
+requirement_ids: ["NFR-GOV-001", "NFR-GOV-002"]
+tests:
+  - name: "test/offline/test_scripts/test_check_test_approval.py::test_valid_approval_before_implementation_passes"
+    covers: "NFR-GOV-001"
+  - name: "test/offline/test_scripts/test_run_eval.py::test_repository_suite_passes_offline"
+    covers: "NFR-GOV-001"
+rollback: "Revert commits b153341..8a851db on copilot/fix-gate-2-static-analysis, restoring the Gate 2 (mypy without requirements.txt / --explicit-package-bases) and Gate 5 (pytest without requirements.txt) CI steps and the previous src/backend typing changes."

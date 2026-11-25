@@ -17,7 +17,7 @@ import json
 import re
 from typing import Any
 
-from backend.contracts.ai_companion import (
+from ..contracts.ai_companion import (
     INSUFFICIENT_EVIDENCE_PHRASE,
     MAX_ANSWER_CHARS,
     MAX_EXAMPLE_CHARS,

@@ -23,6 +23,7 @@ import secrets
 import uuid
 
 from src.backend.contracts.models import Principal, UserRecord
+from src.backend.db.repositories import InMemoryStores, PostgresStores
 
 _SCRYPT_N = 2 ** 14
 _SCRYPT_R = 8
@@ -72,7 +73,7 @@ class AuthSecurity:
     Implements: ADR-009; INV-AUTH-001
     """
 
-    def __init__(self, stores: object) -> None:
+    def __init__(self, stores: InMemoryStores | PostgresStores) -> None:
         self._stores = stores
 
     def hash_password(self, password: str) -> tuple[str, str]:
