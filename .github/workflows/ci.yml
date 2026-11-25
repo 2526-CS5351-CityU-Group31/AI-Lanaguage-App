@@ -47,13 +47,21 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      # Project dependencies are required so mypy can resolve real stubs for
+      # fastapi, pydantic, psycopg and uvicorn; without them every third-party
+      # symbol is Any and --strict reports spurious errors.
       - name: Install Analysis Tools
-        run: pip install mypy
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install mypy
       - name: Byte-compile Python Sources (syntax lint)
         run: |
           if [ -d src ]; then python -m compileall -q src; fi
           if [ -d scripts ]; then python -m compileall -q scripts; fi
       - name: Strict Type Checking
+        env:
+          MYPYPATH: src
         run: |
           if [ -d src ]; then
             mypy --strict src
@@ -141,8 +149,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      # The API modules import fastapi/pydantic and the Postgres repositories
+      # import psycopg, so the gate needs the runtime dependencies as well.
       - name: Install Test Dependencies
-        run: pip install pytest pyyaml
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pyyaml
       - name: Run Offline Regression Suite
         run: |
           if find test/offline -name 'test_*.py' | grep -q .; then

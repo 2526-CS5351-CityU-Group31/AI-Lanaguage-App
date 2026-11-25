@@ -10,7 +10,21 @@ Implements: ADR-009 (owner-scoped repositories); structural-constraints.md S6
 
 from __future__ import annotations
 
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
+
+if TYPE_CHECKING:
+    import psycopg
+    import psycopg_pool
+else:  # runtime: imported lazily so offline tests without psycopg still run
+    try:
+        import psycopg
+        import psycopg_pool
+    except ImportError:
+        # psycopg is a declared dependency (requirements.txt) and carries full
+        # type information, so no ``type: ignore`` is needed: mypy only ever
+        # sees the TYPE_CHECKING import above, which has no failure branch.
+        psycopg = None
+        psycopg_pool = None
 
 from src.backend.contracts.models import UserRecord
 
@@ -191,15 +205,6 @@ class InMemoryStores:
 #   INV-PROG-001, INV-AUTH-001, INV-SEC-001 (no corpus write path here),
 #   S6 (single writer per store), ADR-011 (Render managed Postgres)
 # ==========================================================================
-
-try:  # imported lazily so offline tests without psycopg still run
-    import psycopg
-    import psycopg_pool
-except Exception:  # pragma: no cover - import guard
-    psycopg = None  # type: ignore[assignment]
-    psycopg_pool = None  # type: ignore[assignment]
-
-from src.backend.contracts.models import UserRecord
 
 
 class PostgresUserRepository:
