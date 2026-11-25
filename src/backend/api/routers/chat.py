@@ -14,9 +14,12 @@ displayed or persisted before a deterministic verdict.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable, Protocol
 
 from src.backend.auth.security import AuthenticationError
 from src.backend.contracts.models import LEARNER_MODE_TO_TASK, Principal
+from src.backend.auth.security import AuthSecurity
+from src.backend.safety_boundary.scope_guard import ScopeGuard, ScopeResult
 
 # Approved fixed scope strings (INV-SCOPE-002 / INV-SCOPE-004 / INV-SCOPE-005).
 FIXED_REFUSAL = "I'm sorry, but I can only help with language-learning questions."
@@ -31,17 +34,6 @@ FIXED_RESUBMIT = (
 
 
 @dataclass(frozen=True)
-class ScopeVerdict:
-    """Deterministic scope result for one message.
-
-    Implements: INV-SCOPE-001, INV-SCOPE-002, INV-SCOPE-004, INV-SCOPE-005
-    """
-
-    status: str  # accepted | rejected | uncertain | mixed
-    requires_grounding: bool = False
-
-
-@dataclass(frozen=True)
 class ChatTurn:
     """A completed, validated chat turn.
 
@@ -50,8 +42,17 @@ class ChatTurn:
 
     session_id: str
     turn_id: str
-    response: dict
+    response: dict[str, object]
     source_ids: tuple[str, ...] = ()
+
+
+class ChatPipeline(Protocol):
+    """Typed boundary for the advisory pipeline invoked after scope approval.
+
+    Implements: ADR-005; INV-SCOPE-003
+    """
+
+    def run(self, **kwargs: object) -> dict[str, object]: ...
 
 
 class ChatRouter:
@@ -60,7 +61,12 @@ class ChatRouter:
     Implements: INV-SCOPE-001, INV-SCOPE-003; FR-CHAT-001; ADR-005
     """
 
-    def __init__(self, security: object, scope_guard: object, pipeline_factory) -> None:
+    def __init__(
+        self,
+        security: AuthSecurity,
+        scope_guard: ScopeGuard,
+        pipeline_factory: Callable[[], ChatPipeline],
+    ) -> None:
         self._security = security
         self._scope_guard = scope_guard
         self._make_pipeline = pipeline_factory
@@ -80,7 +86,7 @@ class ChatRouter:
         request_id: str,
         learner_mode: str = "text",
         topic: str | None = None,
-    ) -> dict:
+    ) -> dict[str, object]:
         """Scope-gate the message, then hand accepted turns to the pipeline.
 
         Implements: INV-SCOPE-001 (scope precedes retrieval/model);
@@ -95,7 +101,7 @@ class ChatRouter:
         self._principal(token)
 
         # INV-SCOPE-001: scope control runs before any downstream call.
-        verdict: ScopeVerdict = self._scope_guard.classify(message)
+        verdict: ScopeResult = self._scope_guard.classify(message)
 
         if verdict.status == "rejected":
             return {
@@ -130,10 +136,13 @@ class ChatRouter:
             task=task,
             topic=topic,
         )
+        source_ids = result.get("source_ids", [])
+        if not isinstance(source_ids, list):
+            source_ids = []
         return {
             "task": result.get("task", task),
             "abstained": bool(result.get("abstained", False)),
-            "source_ids": list(result.get("source_ids", [])),
+            "source_ids": source_ids,
             "answer": result.get("answer", ""),
             "validation_id": result.get("validation_id", request_id),
             "scope_status": "accepted",

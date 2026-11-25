@@ -13,15 +13,31 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Callable, Protocol, cast
 
 from src.backend.auth.router import AuthRouter
 from src.backend.auth.security import AuthSecurity
-from src.backend.db.repositories import InMemoryStores
+from src.backend.db.repositories import InMemoryStores, PostgresStores
+from src.backend import config as backend_config
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+
+class RuntimeConfig(Protocol):
+    """Configuration consumed by the application composition root.
+
+    Implements: ADR-011; S5
+    """
+
+    database_url: str | None
+    port: int
+
 
 logger = logging.getLogger(__name__)
 
 
-def build_stores(database_url: str | None):
+def build_stores(database_url: str | None) -> InMemoryStores | PostgresStores:
     """Build production stores over PostgreSQL, falling back to in-memory.
 
     Implements: ADR-011 (Render managed Postgres); ADR-009; INV-SEC-001
@@ -62,15 +78,13 @@ class AppEntry:
     Implements: ADR-001; INV-SEC-002; ADR-011
     """
 
-    stores: object = field(default_factory=InMemoryStores)
-    security: object = None  # type: ignore[assignment]
-    auth: AuthRouter = None  # type: ignore[assignment]
+    stores: InMemoryStores | PostgresStores = field(default_factory=InMemoryStores)
+    security: AuthSecurity = field(init=False)
+    auth: AuthRouter = field(init=False)
 
     def __post_init__(self) -> None:
-        if self.security is None:
-            self.security = AuthSecurity(self.stores)
-        if self.auth is None:
-            self.auth = AuthRouter(security=self.security, stores=self.stores)
+        self.security = AuthSecurity(self.stores)
+        self.auth = AuthRouter(security=self.security, stores=self.stores)
 
     def routes(self) -> list[RouteSpec]:
         """Return the registered routes for introspection.
@@ -95,7 +109,9 @@ class AppEntry:
         return any(not route.accepts_json_only for route in self.routes())
 
 
-def create_app(stores: object | None = None) -> AppEntry:
+def create_app(
+    stores: InMemoryStores | PostgresStores | None = None,
+) -> AppEntry:
     """Application factory used by the ASGI entrypoint and tests.
 
     Implements: ADR-001; ADR-011
@@ -104,17 +120,18 @@ def create_app(stores: object | None = None) -> AppEntry:
     """
     if stores is not None:
         return AppEntry(stores=stores)
-    from src.backend.config import load_config
-
     try:
-        config = load_config()
-        database_url = config.database_url
+        load_config = cast(
+            Callable[[], RuntimeConfig],
+            getattr(backend_config, "load_config"),
+        )
+        database_url = load_config().database_url
     except Exception:  # pragma: no cover - config not exported in some tests
         database_url = None
     return AppEntry(stores=build_stores(database_url))
 
 
-def build_fastapi_app() -> object:
+def build_fastapi_app() -> FastAPI:
     """Return the FastAPI ASGI application (server entrypoint).
 
     Implements: ADR-001; ADR-011; INV-SEC-002
@@ -133,8 +150,10 @@ def run() -> None:
     """
     import uvicorn
 
-    from src.backend.config import load_config
-
+    load_config = cast(
+        Callable[[], RuntimeConfig],
+        getattr(backend_config, "load_config"),
+    )
     config = load_config()
     uvicorn.run(build_fastapi_app(), host="0.0.0.0", port=config.port)
 

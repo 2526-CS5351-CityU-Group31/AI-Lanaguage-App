@@ -12,7 +12,9 @@ from model output. Every query is scoped to the authenticated user id.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
+from src.backend.db.repositories import InMemoryStores, PostgresStores
 
 @dataclass(frozen=True)
 class DashboardMetrics:
@@ -33,7 +35,7 @@ class ProgressService:
     Implements: INV-PROG-001; FR-DASH-001; ADR-008; S6
     """
 
-    def __init__(self, stores: object) -> None:
+    def __init__(self, stores: InMemoryStores | PostgresStores) -> None:
         self._stores = stores
 
     def record_event(
@@ -41,7 +43,7 @@ class ProgressService:
         *,
         user_id: str,
         event_type: str,
-        payload: dict | None = None,
+        payload: dict[str, Any] | None = None,
         idempotency_key: str,
     ) -> None:
         """Append one immutable learning event (idempotent by key).

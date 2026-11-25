@@ -10,7 +10,7 @@ Implements: ADR-009 (owner-scoped repositories); structural-constraints.md S6
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol, cast
 
 from src.backend.contracts.models import UserRecord
 
@@ -123,7 +123,7 @@ class InMemoryEventStore:
     """
 
     def __init__(self) -> None:
-        self._rows: list[dict] = []
+        self._rows: list[dict[str, Any]] = []
         self._keys: set[tuple[str, str]] = set()
 
     def append(
@@ -131,7 +131,7 @@ class InMemoryEventStore:
         *,
         user_id: str,
         event_type: str,
-        payload: dict,
+        payload: dict[str, Any],
         idempotency_key: str,
     ) -> None:
         key = (user_id, idempotency_key)
@@ -147,7 +147,7 @@ class InMemoryEventStore:
             }
         )
 
-    def for_user(self, user_id: str) -> list[dict]:
+    def for_user(self, user_id: str) -> list[dict[str, Any]]:
         return [dict(row) for row in self._rows if row["user_id"] == user_id]
 
 
@@ -209,11 +209,14 @@ class PostgresUserRepository:
     through a caller-supplied id - lookups are by session-derived id)
     """
 
-    def __init__(self, pool: "psycopg_pool.ConnectionPool") -> None:
+    def __init__(
+        self,
+        pool: "psycopg_pool.ConnectionPool[psycopg.Connection[dict[str, Any]]]",
+    ) -> None:
         self._pool = pool
 
     @staticmethod
-    def _row_to_record(row: dict) -> UserRecord:
+    def _row_to_record(row: dict[str, Any]) -> UserRecord:
         return UserRecord(
             user_id=str(row["user_id"]),
             email=row["email"],
@@ -287,7 +290,10 @@ class PostgresSessionRepository:
     Implements: FR-AUTH-001; ADR-009 (principal from session only)
     """
 
-    def __init__(self, pool: "psycopg_pool.ConnectionPool") -> None:
+    def __init__(
+        self,
+        pool: "psycopg_pool.ConnectionPool[psycopg.Connection[dict[str, Any]]]",
+    ) -> None:
         self._pool = pool
 
     def issue(self, token_hash: str, user_id: str) -> None:
@@ -321,7 +327,10 @@ class PostgresVocabularyStore:
     Implements: FR-VOC-002; ADR-009 (owner-scoped); S6
     """
 
-    def __init__(self, pool: "psycopg_pool.ConnectionPool") -> None:
+    def __init__(
+        self,
+        pool: "psycopg_pool.ConnectionPool[psycopg.Connection[dict[str, Any]]]",
+    ) -> None:
         self._pool = pool
 
     def set_state(self, *, user_id: str, entry_id: str, state: str) -> None:
@@ -360,7 +369,10 @@ class PostgresEventStore:
     on learning_events (INV-PROG-001 enforcement by grant).
     """
 
-    def __init__(self, pool: "psycopg_pool.ConnectionPool") -> None:
+    def __init__(
+        self,
+        pool: "psycopg_pool.ConnectionPool[psycopg.Connection[dict[str, Any]]]",
+    ) -> None:
         self._pool = pool
 
     def append(
@@ -368,7 +380,7 @@ class PostgresEventStore:
         *,
         user_id: str,
         event_type: str,
-        payload: dict,
+        payload: dict[str, Any],
         idempotency_key: str,
         corrects_event_id: int | None = None,
     ) -> None:
@@ -383,7 +395,7 @@ class PostgresEventStore:
                 (user_id, event_type, Jsonb(payload), idempotency_key, corrects_event_id),
             )
 
-    def for_user(self, user_id: str) -> list[dict]:
+    def for_user(self, user_id: str) -> list[dict[str, Any]]:
         with self._pool.connection() as conn:
             rows = conn.execute(
                 "SELECT event_type, payload, idempotency_key FROM learning_events"
@@ -407,7 +419,10 @@ class PostgresStores:
     Implements: ADR-009; S6; ADR-011; INV-SEC-001 (no corpus write path)
     """
 
-    def __init__(self, pool: "psycopg_pool.ConnectionPool") -> None:
+    def __init__(
+        self,
+        pool: "psycopg_pool.ConnectionPool[psycopg.Connection[dict[str, Any]]]",
+    ) -> None:
         self.users = PostgresUserRepository(pool)
         self.sessions = PostgresSessionRepository(pool)
         self.vocabulary = PostgresVocabularyStore(pool)
@@ -423,7 +438,12 @@ class PostgresStores:
         self._pool.close()
 
 
-def make_pool(database_url: str, *, min_size: int = 1, max_size: int = 5):
+def make_pool(
+    database_url: str,
+    *,
+    min_size: int = 1,
+    max_size: int = 5,
+) -> "psycopg_pool.ConnectionPool[psycopg.Connection[dict[str, Any]]]":
     """Create a psycopg connection pool for the configured DATABASE_URL.
 
     Implements: ADR-011 (Render managed Postgres); INV-SEC-001 (the DSN must
@@ -433,12 +453,15 @@ def make_pool(database_url: str, *, min_size: int = 1, max_size: int = 5):
         raise RuntimeError("psycopg is not installed; cannot open a database pool")
     from psycopg.rows import dict_row
 
-    pool = psycopg_pool.ConnectionPool(
-        conninfo=database_url,
-        min_size=min_size,
-        max_size=max_size,
-        kwargs={"row_factory": dict_row},
-        open=True,
+    pool = cast(
+        psycopg_pool.ConnectionPool[psycopg.Connection[dict[str, Any]]],
+        psycopg_pool.ConnectionPool(
+            conninfo=database_url,
+            min_size=min_size,
+            max_size=max_size,
+            kwargs={"row_factory": dict_row},
+            open=True,
+        ),
     )
     pool.wait(timeout=10)
     return pool

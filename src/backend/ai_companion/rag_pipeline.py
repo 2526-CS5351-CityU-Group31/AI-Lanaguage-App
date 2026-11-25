@@ -13,7 +13,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Literal
 
-from backend.ai_companion.prompt_assembly import (
+from src.backend.ai_companion.prompt_assembly import (
     EvidenceChunk,
     HistoryTurn,
     PromptAssembler,
@@ -24,9 +24,9 @@ from backend.ai_companion.prompt_assembly import (
     estimate_tokens,
     load_prompt_catalog,
 )
-from backend.ai_companion.retrieval_adapter import RetrievalAdapter
-from backend.ai_companion.tutor import Tutor, TutorRequest, TutorResult
-from backend.contracts.ai_companion import (
+from src.backend.ai_companion.retrieval_adapter import RetrievalAdapter
+from src.backend.ai_companion.tutor import Tutor, TutorRequest, TutorResult
+from src.backend.contracts.ai_companion import (
     CEFR_LEVELS,
     INSUFFICIENT_EVIDENCE_PHRASE,
     LANGUAGE_ENGLISH,
