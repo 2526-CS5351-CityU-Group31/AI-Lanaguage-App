@@ -79,12 +79,16 @@ class AppEntry:
     """
 
     stores: InMemoryStores | PostgresStores = field(default_factory=InMemoryStores)
-    security: AuthSecurity = field(init=False)
-    auth: AuthRouter = field(init=False)
+    security: AuthSecurity | None = None
+    auth: AuthRouter | None = None
 
     def __post_init__(self) -> None:
-        self.security = AuthSecurity(self.stores)
-        self.auth = AuthRouter(security=self.security, stores=self.stores)
+        security = self.security
+        if security is None:
+            security = AuthSecurity(self.stores)
+        self.security = security
+        if self.auth is None:
+            self.auth = AuthRouter(security=security, stores=self.stores)
 
     def routes(self) -> list[RouteSpec]:
         """Return the registered routes for introspection.

@@ -28,8 +28,8 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Protocol
 
-from src.backend.config import ProviderGatewayConfig
-from src.backend.contracts.ai_companion import (
+from ..config import ProviderGatewayConfig
+from ..contracts.ai_companion import (
     InvalidRequestError,
     ModelGatewayError,
     ModelPermanentError,

@@ -20,7 +20,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Callable, Literal, Mapping, Sequence
 
-from src.backend.contracts.ai_companion import (
+from backend.contracts.ai_companion import (  # type: ignore[import-not-found]
     INSUFFICIENT_EVIDENCE_PHRASE,
     TaskType,
 )

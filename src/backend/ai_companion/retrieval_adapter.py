@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from src.backend.contracts.ai_companion import (
+from ..contracts.ai_companion import (
     CEFR_LEVELS,
     DEFAULT_MIN_SCORE,
     DEFAULT_TOP_K,

@@ -216,7 +216,9 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
       RP-011 (readiness reflects DB state); ADR-009
     """
     entry = create_entry()
-    auth_router = router or entry.auth
+    auth_router = router if router is not None else entry.auth
+    if auth_router is None:
+        raise RuntimeError("application auth router is not configured")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -246,6 +248,8 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
     app.state.vocabulary_service = VocabularyService(entry.stores)
     app.state.progress_service = ProgressService(entry.stores)
     app.state.scope_guard = ScopeGuard()
+    if entry.security is None:
+        raise RuntimeError("application security is not configured")
     app.state.chat_router = ChatRouter(
         security=entry.security,
         scope_guard=app.state.scope_guard,
@@ -257,7 +261,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         """Liveness probe (static 200). Implements: RP-011; ADR-011."""
         return {"status": "ok"}
 
-    @app.get("/ready")
+    @app.get("/ready", response_model=dict[str, str])
     def ready(request: Request) -> dict[str, str] | JSONResponse:
         """Readiness probe reflecting database availability.
 
@@ -366,7 +370,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         cards = loader.select_random(level=level, count=count, seed=seed, topic=topic)
         return [VocabularyCardResponse(**card.__dict__) for card in cards]
 
-    @app.post("/me/vocabulary/{entry_id}")
+    @app.post("/me/vocabulary/{entry_id}", response_model=dict[str, str])
     def record_vocabulary(
         entry_id: str,
         body: FamiliarityRequest,
@@ -405,7 +409,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
             recent_topics=metrics.recent_topics,
         )
 
-    @app.post("/sessions")
+    @app.post("/sessions", response_model=dict[str, str])
     def create_session(request: Request) -> dict[str, str] | JSONResponse:
         """Create a server-generated chat session owned by the caller.
 
@@ -422,7 +426,7 @@ def build_http_app(router: AuthRouter | None = None) -> FastAPI:
         request.app.state.stores.chat_sessions.create(session_id, principal.user_id)
         return {"session_id": session_id}
 
-    @app.post("/sessions/{session_id}/messages")
+    @app.post("/sessions/{session_id}/messages", response_model=None)
     def post_message(
         session_id: str,
         body: MessageRequest,
