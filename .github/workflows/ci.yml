@@ -59,12 +59,15 @@ jobs:
         run: |
           if [ -d src ]; then python -m compileall -q src; fi
           if [ -d scripts ]; then python -m compileall -q scripts; fi
+      # MYPYPATH must stay unset: with it, mypy also discovers src/backend/* as
+      # the top-level "backend.*" package and every module is reported twice
+      # ("src.backend.x" vs "backend.x"). The root has src/__init__.py, so the
+      # source tree is "src.backend.*"; --explicit-package-bases pins that
+      # mapping from the checkout root and keeps it independent of the env.
       - name: Strict Type Checking
-        env:
-          MYPYPATH: src
         run: |
           if [ -d src ]; then
-            mypy --strict src
+            mypy --strict --explicit-package-bases src
           else
             echo "No src directory; skipping type check."
           fi
